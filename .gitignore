@@ -1,1 +1,8 @@
+# Variables de entorno (contiene tokens sensibles)
 .env
+
+# Entorno virtual de Python
+venv/
+
+# Docker
+.dockerignore

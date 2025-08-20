@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    ports:
+      - "127.0.0.1:5000:5000"  # Solo bind local (nginx hace proxy)
+    env_file:
+      - .env
+    restart: always
+    volumes:
+      - ./logs:/app/logs  # Para logs si los quieres persistir
