@@ -8,9 +8,10 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Configuración de Facebook Messenger
+# Configuración de WhatsApp Business API
 VERIFY_TOKEN = os.getenv('VERIFY_TOKEN', 'kavak_bot_2024')  # Cambia esto por un token único
-PAGE_ACCESS_TOKEN = os.getenv('PAGE_ACCESS_TOKEN')  # Token de tu página de Facebook
+PAGE_ACCESS_TOKEN = os.getenv('PAGE_ACCESS_TOKEN')  # Token de tu página/WhatsApp Business
+PHONE_NUMBER_ID = os.getenv('PHONE_NUMBER_ID')  # ID del número de WhatsApp Business
 
 @app.route('/')
 def home():
@@ -34,24 +35,36 @@ def webhook_verify():
 
 @app.route('/webhook', methods=['POST'])
 def webhook_receive():
-    """Recibir mensajes de Facebook Messenger"""
+    """Recibir mensajes de WhatsApp Business"""
     try:
         data = request.get_json()
+        print(f"Webhook recibido: {data}")  # Debug: ver qué llega
         
-        # Verificar que sea un mensaje
-        if data.get('object') == 'page':
+        # WhatsApp Business API estructura
+        if data.get('object') == 'whatsapp_business_account':
             for entry in data.get('entry', []):
-                for messaging_event in entry.get('messaging', []):
-                    
-                    # Verificar que es un mensaje recibido
-                    if messaging_event.get('message'):
-                        sender_id = messaging_event['sender']['id']
-                        message_text = messaging_event['message'].get('text', '')
+                for change in entry.get('changes', []):
+                    if change.get('field') == 'messages':
+                        value = change.get('value', {})
                         
-                        print(f"Mensaje recibido de {sender_id}: {message_text}")
-                        
-                        # Respuesta simple por ahora
-                        send_message(sender_id, f"¡Hola! Recibí tu mensaje: '{message_text}'. Soy el bot de Kavak y estoy en desarrollo. 🚗")
+                        # Verificar que hay mensajes
+                        if 'messages' in value:
+                            for message in value['messages']:
+                                # Obtener datos del mensaje
+                                sender_phone = message.get('from')
+                                message_id = message.get('id')
+                                message_type = message.get('type', '')
+                                
+                                # Obtener texto del mensaje
+                                message_text = ""
+                                if message_type == 'text':
+                                    message_text = message.get('text', {}).get('body', '')
+                                
+                                print(f"WhatsApp mensaje de {sender_phone}: {message_text} (tipo: {message_type})")
+                                
+                                # Responder solo a mensajes de texto
+                                if message_text:
+                                    send_whatsapp_message(sender_phone, f"¡Hola! Recibí tu mensaje: '{message_text}'. Soy el bot de Kavak y estoy funcionando! 🚗")
         
         return "OK", 200
     
@@ -59,8 +72,46 @@ def webhook_receive():
         print(f"Error procesando webhook: {e}")
         return "Error", 500
 
+def send_whatsapp_message(recipient_phone, message_text):
+    """Enviar mensaje a través de WhatsApp Business API"""
+    if not PAGE_ACCESS_TOKEN:
+        print("Error: PAGE_ACCESS_TOKEN no configurado")
+        return False
+    
+    # Obtener el Phone Number ID (necesario para WhatsApp)
+    # Este valor lo obtienes de Facebook Developers > WhatsApp > Getting Started
+    PHONE_NUMBER_ID = os.getenv('PHONE_NUMBER_ID', 'tu_phone_number_id_aqui')
+    
+    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
+    
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": recipient_phone,
+        "type": "text",
+        "text": {
+            "body": message_text
+        }
+    }
+    
+    headers = {
+        "Authorization": f"Bearer {PAGE_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code == 200:
+            print(f"WhatsApp mensaje enviado exitosamente a {recipient_phone}")
+            return True
+        else:
+            print(f"Error enviando WhatsApp mensaje: {response.status_code} - {response.text}")
+            return False
+    except Exception as e:
+        print(f"Excepción enviando WhatsApp mensaje: {e}")
+        return False
+
 def send_message(recipient_id, message_text):
-    """Enviar mensaje a través de Facebook Messenger"""
+    """Enviar mensaje a través de Facebook Messenger (legacy)"""
     if not PAGE_ACCESS_TOKEN:
         print("Error: PAGE_ACCESS_TOKEN no configurado")
         return False
