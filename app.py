@@ -141,7 +141,3 @@ def send_message(recipient_id, message_text):
 def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "kavak-bot"}, 200
-
-if __name__ == '__main__':
-    # Para desarrollo local
-    app.run(debug=True, host='0.0.0.0', port=5000)
