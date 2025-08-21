@@ -305,26 +305,34 @@ def eliminar_usuario(telefono: str):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/debug-mensaje', methods=['POST'])
-def debug_mensaje():
-    """Endpoint para debugging de mensajes"""
+@app.route('/test-agente', methods=['POST'])
+def test_agente():
+    """Endpoint para probar el agente directamente"""
     try:
         data = request.get_json()
-        mensaje = data.get('mensaje', '')
-        telefono = data.get('telefono', '+1234567890')
+        mensaje = data.get('mensaje', 'Necesito información sobre los beneficios de Kavak')
+        telefono = data.get('telefono', '5215519118275')
         
-        # Procesar con el agente y capturar pasos intermedios
-        bot_atencion._configurar_tools_para_usuario(telefono)
-        respuesta = bot_atencion.agente.agent_executor.invoke({
-            "input": mensaje
-        })
+        print(f"🔍 DEBUG: Probando agente con mensaje: {mensaje}")
+        print(f"🔍 DEBUG: Teléfono: {telefono}")
+        
+        # Probar agente directamente
+        respuesta = bot_atencion.agente.procesar_mensaje(mensaje, telefono)
+        
+        print(f"🔍 DEBUG: Respuesta del agente: {respuesta}")
+        
+        # Obtener estado después
+        estado = bot_atencion.obtener_estado_agente(telefono)
         
         return jsonify({
-            "mensaje_usuario": mensaje,
-            "respuesta_final": respuesta.get('output'),
-            "pasos_intermedios": respuesta.get('intermediate_steps', []),
+            "mensaje_enviado": mensaje,
+            "respuesta_agente": respuesta,
+            "estado_usuario": estado,
             "tools_disponibles": [tool.name for tool in bot_atencion.agente.tools]
         }), 200
         
     except Exception as e:
+        print(f"❌ ERROR en test-agente: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
