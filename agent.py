@@ -69,7 +69,7 @@ class CatalogoTool(BaseTool):
     """
     
     name: str = "catalogo_autos"
-    description: str = "Busca y recomienda autos del catálogo basado en preferencias como presupuesto, marca, modelo, año, tipo de vehículo"
+    description: str = "Busca y recomienda autos del catálogo basado en preferencias como presupuesto, marca, modelo, año, tipo de vehículo, kilometraje, características (bluetooth, carplay). Usa esta tool cuando el usuario quiera ver autos disponibles, buscar un auto específico, o pida recomendaciones de vehículos."
     gestor_estados: GestorEstados = Field(exclude=True)
     telefono_actual: str = Field(exclude=True)
     
@@ -86,19 +86,67 @@ class CatalogoTool(BaseTool):
         Returns:
             Recomendaciones de autos del catálogo
         """
-        # Obtener el estado del usuario actual
-        estado = self.gestor_estados.obtener_estado(self.telefono_actual)
+        try:
+            # Importar módulos necesarios
+            from catalogo_autos import CatalogoAutos, formatear_lista_autos
+            
+            # Obtener el estado del usuario actual
+            estado = self.gestor_estados.obtener_estado(self.telefono_actual)
+            
+            # Registrar consulta y preferencias en estado global
+            estado.actualizar('ultima_consulta', f"catalogo: {preferencias}")
+            estado.actualizar('cliente_preferencias', preferencias)
+            estado.actualizar('tipo_consulta', 'busqueda_catalogo')
+            
+            print(f"🔍 DEBUG CatalogoTool: Buscando autos con preferencias: {preferencias}")
+            
+            # Inicializar catálogo
+            catalogo = CatalogoAutos()
+            
+            # Buscar autos según preferencias
+            autos_encontrados = catalogo.buscar_autos(preferencias)
+            
+            print(f"🔍 DEBUG CatalogoTool: Encontrados {len(autos_encontrados)} autos")
+            
+            # Guardar resultados en el estado
+            estado.actualizar_autos_recomendados(autos_encontrados)
+            
+            # Si se encontraron autos, guardar filtros aplicados
+            if autos_encontrados:
+                # Extraer filtros para guardar en estado
+                filtros_aplicados = catalogo._extraer_filtros(preferencias)
+                estado.actualizar_filtros_busqueda(filtros_aplicados)
+                
+                print(f"🔍 DEBUG CatalogoTool: Filtros aplicados: {filtros_aplicados}")
+            
+            # Formatear respuesta
+            respuesta_formateada = formatear_lista_autos(autos_encontrados)
+            
+            # Registrar que se proporcionaron recomendaciones
+            estado.actualizar('ultima_respuesta_tipo', 'catalogo_autos')
+            
+            # Agregar contexto adicional
+            if autos_encontrados:
+                respuesta_final = f"{respuesta_formateada}\n\n💡 También puedo ayudarte con el financiamiento de cualquiera de estos autos si te interesa."
+            else:
+                # Sugerir alternativas si no se encontraron autos
+                estadisticas = catalogo.obtener_estadisticas()
+                marcas_disponibles = estadisticas.get('marcas_disponibles', [])[:5]  # Top 5 marcas
+                
+                respuesta_final = f"{respuesta_formateada}\n\n💡 Tenemos autos de estas marcas disponibles: {', '.join(marcas_disponibles)}\n\n¿Te gustaría ajustar tu búsqueda o ver opciones de alguna marca específica?"
+            
+            return respuesta_final
+            
+        except ImportError as e:
+            print(f"❌ ERROR ImportError en CatalogoTool: {e}")
+            return "Lo siento, hay un problema técnico con el catálogo. ¿Podrías intentar de nuevo en un momento?"
         
-        # Registrar consulta y preferencias en estado global
-        estado.actualizar('ultima_consulta', f"catalogo: {preferencias}")
-        estado.actualizar('cliente_preferencias', preferencias)
-        
-        # Por ahora solo pass - implementaremos lógica después
-        pass
-        
-        return "Recomendaciones de catálogo - En construcción"
-
-
+        except Exception as e:
+            print(f"❌ ERROR en CatalogoTool: {e}")
+            import traceback
+            traceback.print_exc()
+            return "Disculpa, ocurrió un error al buscar en el catálogo. ¿Podrías reformular tu búsqueda o ser más específico sobre qué tipo de auto buscas?"
+            
 class FinanzasTool(BaseTool):
     """
     Tool para calcular y otorgar planes de financiamiento.

@@ -13,3 +13,4 @@ openai
 
 # Additional utilities
 pydantic==2.5.3
+pandas

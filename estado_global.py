@@ -16,12 +16,24 @@ class EstadoGlobal:
             'cliente_telefono': None,
             'cliente_preferencias': {},
             
-            # Auto seleccionado/recomendado
+            # Auto seleccionado/recomendado - EXPANDIDO PARA CSV
             'auto_seleccionado': None,
+            'auto_stock_id': None,        # ID del auto en el CSV
             'auto_precio': None,
-            'auto_marca': None,
-            'auto_modelo': None,
-            'auto_año': None,
+            'auto_marca': None,           # make
+            'auto_modelo': None,          # model  
+            'auto_año': None,             # year
+            'auto_kilometraje': None,     # km
+            'auto_version': None,         # version
+            'auto_bluetooth': None,       # bluetooth
+            'auto_car_play': None,        # car_play
+            'auto_largo': None,           # dimensiones
+            'auto_ancho': None,
+            'auto_altura': None,
+            
+            # Auto búsqueda/filtros
+            'filtros_busqueda': {},       # Para recordar últimos filtros
+            'autos_recomendados': [],     # Lista de autos sugeridos
             
             # Financiamiento
             'enganche': None,
@@ -165,6 +177,105 @@ class EstadoGlobal:
             'timestamp': self._estado.get('timestamp'),
             'total_acciones': len(self._estado.get('historial_acciones', []))
         }
+
+    def obtener_info_auto_completa(self) -> Dict[str, Any]:
+        """
+        Obtener toda la información completa del auto seleccionado
+        
+        Returns:
+            Diccionario con información completa del auto
+        """
+        return {
+            'stock_id': self._estado.get('auto_stock_id'),
+            'precio': self._estado.get('auto_precio'),
+            'marca': self._estado.get('auto_marca'),
+            'modelo': self._estado.get('auto_modelo'),
+            'año': self._estado.get('auto_año'),
+            'kilometraje': self._estado.get('auto_kilometraje'),
+            'version': self._estado.get('auto_version'),
+            'bluetooth': self._estado.get('auto_bluetooth'),
+            'car_play': self._estado.get('auto_car_play'),
+            'dimensiones': {
+                'largo': self._estado.get('auto_largo'),
+                'ancho': self._estado.get('auto_ancho'),
+                'altura': self._estado.get('auto_altura')
+            }
+        }
+
+    def actualizar_auto_seleccionado(self, auto_data: Dict[str, Any]) -> None:
+        """
+        Actualizar toda la información del auto seleccionado desde el CSV
+        
+        Args:
+            auto_data: Diccionario con datos del auto del CSV
+        """
+        mapeo_campos = {
+            'stock_id': 'auto_stock_id',
+            'price': 'auto_precio', 
+            'make': 'auto_marca',
+            'model': 'auto_modelo',
+            'year': 'auto_año',
+            'km': 'auto_kilometraje',
+            'version': 'auto_version',
+            'bluetooth': 'auto_bluetooth',
+            'car_play': 'auto_car_play',
+            'largo': 'auto_largo',
+            'ancho': 'auto_ancho',
+            'altura': 'auto_altura'
+        }
+        
+        # Actualizar campos del auto
+        for campo_csv, campo_estado in mapeo_campos.items():
+            if campo_csv in auto_data:
+                self._estado[campo_estado] = auto_data[campo_csv]
+        
+        # Crear descripción del auto seleccionado
+        auto_descripcion = f"{auto_data.get('make', 'N/A')} {auto_data.get('model', 'N/A')} {auto_data.get('year', 'N/A')}"
+        self._estado['auto_seleccionado'] = auto_descripcion
+        
+        # Actualizar timestamp
+        self._estado['timestamp'] = datetime.now()
+        
+        # Registrar acción
+        accion = {
+            'timestamp': datetime.now(),
+            'accion': 'auto_seleccionado',
+            'auto': auto_descripcion,
+            'precio': auto_data.get('price')
+        }
+        self._estado['historial_acciones'].append(accion)
+
+    def actualizar_filtros_busqueda(self, filtros: Dict[str, Any]) -> None:
+        """
+        Actualizar los filtros de búsqueda usados
+        
+        Args:
+            filtros: Diccionario con filtros aplicados
+        """
+        self._estado['filtros_busqueda'] = filtros
+        self._estado['timestamp'] = datetime.now()
+
+    def actualizar_autos_recomendados(self, autos_lista: List[Dict[str, Any]]) -> None:
+        """
+        Actualizar la lista de autos recomendados
+        
+        Args:
+            autos_lista: Lista de autos recomendados
+        """
+        self._estado['autos_recomendados'] = autos_lista
+        self._estado['timestamp'] = datetime.now()
+
+    def limpiar_auto_completo(self) -> None:
+        """Limpiar toda la información del auto seleccionado y búsquedas"""
+        claves_auto = [
+            'auto_seleccionado', 'auto_stock_id', 'auto_precio', 'auto_marca', 
+            'auto_modelo', 'auto_año', 'auto_kilometraje', 'auto_version',
+            'auto_bluetooth', 'auto_car_play', 'auto_largo', 'auto_ancho', 
+            'auto_altura', 'filtros_busqueda', 'autos_recomendados'
+        ]
+        for clave in claves_auto:
+            self._estado[clave] = None if not clave.endswith('_busqueda') and not clave.endswith('_recomendados') else ({} if clave.endswith('_busqueda') else [])
+        self._estado['timestamp'] = datetime.now()        
     
     def __str__(self) -> str:
         """Representación string del estado para debugging"""
