@@ -16,13 +16,13 @@ class PropuestaValorTool(BaseTool):
     """
     
     name: str = "propuesta_valor"
-    description: str = "Proporciona información básica sobre la propuesta de valor, servicios, garantías y beneficios disponibles"
+    description: str = "Proporciona información básica sobre la propuesta de valor, servicios, garantías y beneficios de Kavak. Usa esta tool para preguntas sobre: sedes/ubicaciones, certificación de autos, proceso digital, financiamiento, garantías, app, o información general de la empresa"
     gestor_estados: GestorEstados = Field(exclude=True)
     telefono_actual: str = Field(exclude=True)
     
     def __init__(self, gestor_estados: GestorEstados, **kwargs):
         super().__init__(gestor_estados=gestor_estados, telefono_actual="", **kwargs)
-    
+        
     def _run(self, query: str) -> str:
         """
         Ejecutar tool de propuesta de valor
@@ -33,16 +33,34 @@ class PropuestaValorTool(BaseTool):
         Returns:
             Respuesta con información de propuesta de valor
         """
-        # Obtener el estado del usuario actual
-        estado = self.gestor_estados.obtener_estado(self.telefono_actual)
+        try:
+            # Importar la base de conocimiento
+            from conocimiento_kavak import buscar_informacion
+            
+            # Obtener el estado del usuario actual
+            estado = self.gestor_estados.obtener_estado(self.telefono_actual)
+            
+            # Registrar la consulta en el estado global
+            estado.actualizar('ultima_consulta', f"propuesta_valor: {query}")
+            estado.actualizar('tipo_consulta', 'informacion_general')
+            
+            # Buscar información relevante usando la base de conocimiento
+            respuesta = buscar_informacion(query)
+            
+            # Registrar que se proporcionó información
+            estado.actualizar('ultima_respuesta_tipo', 'propuesta_valor')
+            
+            # Agregar contexto amigable a la respuesta
+            respuesta_final = f"¡Hola! Te comparto la información sobre Kavak:\n\n{respuesta}\n\n¿Te gustaría saber algo más específico o necesitas ayuda con algo más?"
+            
+            return respuesta_final
+            
+        except ImportError:
+            return "Lo siento, hay un problema técnico con la información. ¿Podrías ser más específico sobre qué te gustaría saber de Kavak?"
         
-        # Registrar la consulta en el estado global
-        estado.actualizar('ultima_consulta', f"propuesta_valor: {query}")
-        
-        # Por ahora solo pass - implementaremos lógica después
-        pass
-        
-        return "Información de propuesta de valor - En construcción"
+        except Exception as e:
+            print(f"Error en PropuestaValorTool: {e}")
+            return "Disculpa, ocurrió un error al buscar la información. ¿Podrías reformular tu pregunta sobre Kavak?"
 
 
 class CatalogoTool(BaseTool):
