@@ -7,6 +7,7 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema import BaseMessage
 from pydantic import BaseModel, Field
 from estado_global import EstadoGlobal, GestorEstados
+from conocimiento_kavak import buscar_informacion
 
 
 class PropuestaValorTool(BaseTool):
@@ -34,8 +35,6 @@ class PropuestaValorTool(BaseTool):
             Respuesta con información de propuesta de valor
         """
         try:
-            # Importar la base de conocimiento
-            from conocimiento_kavak import buscar_informacion
             
             # Obtener el estado del usuario actual
             estado = self.gestor_estados.obtener_estado(self.telefono_actual)

@@ -304,3 +304,27 @@ def eliminar_usuario(telefono: str):
             return jsonify({"error": f"Usuario {telefono} no encontrado"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/debug-mensaje', methods=['POST'])
+def debug_mensaje():
+    """Endpoint para debugging de mensajes"""
+    try:
+        data = request.get_json()
+        mensaje = data.get('mensaje', '')
+        telefono = data.get('telefono', '+1234567890')
+        
+        # Procesar con el agente y capturar pasos intermedios
+        bot_atencion._configurar_tools_para_usuario(telefono)
+        respuesta = bot_atencion.agente.agent_executor.invoke({
+            "input": mensaje
+        })
+        
+        return jsonify({
+            "mensaje_usuario": mensaje,
+            "respuesta_final": respuesta.get('output'),
+            "pasos_intermedios": respuesta.get('intermediate_steps', []),
+            "tools_disponibles": [tool.name for tool in bot_atencion.agente.tools]
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
