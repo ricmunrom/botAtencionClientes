@@ -1,5 +1,4 @@
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify
 import requests
 import os
 from dotenv import load_dotenv
@@ -22,7 +21,7 @@ class AtencionClientesBot:
         self.page_access_token = os.getenv('PAGE_ACCESS_TOKEN')
         self.phone_number_id = os.getenv('PHONE_NUMBER_ID')
         
-        # Inicializar agente principal
+        # Inicializar agente principal (ahora con soporte multiusuario)
         self.agente = AgentePrincipal()
         
         # Validar configuración
@@ -100,7 +99,7 @@ class AtencionClientesBot:
                 if message_text and sender_phone:
                     print(f"Mensaje de {sender_phone}: {message_text}")
                     
-                    # Procesar mensaje con el agente
+                    # Procesar mensaje con el agente (ahora maneja automáticamente el estado por usuario)
                     respuesta = self.agente.procesar_mensaje(message_text, sender_phone)
                     
                     # Enviar respuesta
@@ -212,10 +211,12 @@ def webhook_receive():
 @app.route('/health')
 def health_check():
     """Health check endpoint"""
+    usuarios_activos = len(bot_atencion.agente.obtener_usuarios_activos())
     return {
         "status": "healthy", 
         "service": "atencion-clientes-bot",
-        "agent_status": "initialized"
+        "agent_status": "initialized",
+        "usuarios_activos": usuarios_activos
     }, 200
 
 @app.route('/estado/<telefono>')
@@ -271,5 +272,35 @@ def limpiar_usuarios_inactivos():
             "usuarios_eliminados": usuarios_limpiados,
             "horas_inactividad": horas
         }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/usuarios-activos')
+def obtener_usuarios_activos():
+    """
+    Obtener lista de usuarios activos
+    Endpoint para monitoreo del sistema
+    """
+    try:
+        usuarios = bot_atencion.agente.obtener_usuarios_activos()
+        return jsonify({
+            "total_usuarios": len(usuarios),
+            "usuarios_activos": usuarios
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/eliminar-usuario/<telefono>', methods=['DELETE'])
+def eliminar_usuario(telefono: str):
+    """
+    Eliminar un usuario específico del sistema
+    Endpoint para administración del sistema
+    """
+    try:
+        eliminado = bot_atencion.agente.eliminar_usuario(telefono)
+        if eliminado:
+            return jsonify({"mensaje": f"Usuario {telefono} eliminado exitosamente"}), 200
+        else:
+            return jsonify({"error": f"Usuario {telefono} no encontrado"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
