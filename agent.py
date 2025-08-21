@@ -1,7 +1,7 @@
 import os
 from typing import Dict, Any, List, Optional
 from langchain.tools import BaseTool
-from langchain.agents import AgentExecutor, create_openai_functions_agent
+from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema import BaseMessage
@@ -166,7 +166,7 @@ class AgentePrincipal:
         self.system_prompt = self._crear_prompt_sistema()
         
         # Crear agente
-        self.agent = create_openai_functions_agent(
+        self.agent = create_openai_tools_agent(
             self.llm, 
             self.tools, 
             self.system_prompt
@@ -200,7 +200,7 @@ class AgentePrincipal:
             ("user", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
-        
+
         return prompt
     
     def _configurar_tools_para_usuario(self, telefono_usuario: str) -> None:
