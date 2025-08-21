@@ -17,10 +17,10 @@ class PropuestaValorTool(BaseTool):
     
     name: str = "propuesta_valor"
     description: str = "Proporciona información básica sobre la propuesta de valor, servicios, garantías y beneficios disponibles"
+    estado_global: EstadoGlobal = Field(exclude=True)
     
-    def __init__(self, estado_global: EstadoGlobal):
-        super().__init__()
-        self.estado_global = estado_global
+    def __init__(self, estado_global: EstadoGlobal, **kwargs):
+        super().__init__(estado_global=estado_global, **kwargs)
     
     def _run(self, query: str) -> str:
         """
@@ -49,10 +49,10 @@ class CatalogoTool(BaseTool):
     
     name: str = "catalogo_autos"
     description: str = "Busca y recomienda autos del catálogo basado en preferencias como presupuesto, marca, modelo, año, tipo de vehículo"
+    estado_global: EstadoGlobal = Field(exclude=True)
     
-    def __init__(self, estado_global: EstadoGlobal):
-        super().__init__()
-        self.estado_global = estado_global
+    def __init__(self, estado_global: EstadoGlobal, **kwargs):
+        super().__init__(estado_global=estado_global, **kwargs)
     
     def _run(self, preferencias: str) -> str:
         """
@@ -82,10 +82,10 @@ class FinanzasTool(BaseTool):
     
     name: str = "planes_financiamiento"
     description: str = "Calcula planes de financiamiento basado en enganche, precio del auto, tasa de interés del 10% y plazos de 3 a 6 años"
+    estado_global: EstadoGlobal = Field(exclude=True)
     
-    def __init__(self, estado_global: EstadoGlobal):
-        super().__init__()
-        self.estado_global = estado_global
+    def __init__(self, estado_global: EstadoGlobal, **kwargs):
+        super().__init__(estado_global=estado_global, **kwargs)
     
     def _run(self, parametros_financiamiento: str) -> str:
         """
@@ -171,7 +171,7 @@ class AgentePrincipal:
             - Haz preguntas para entender mejor las necesidades del cliente
             - Usa las herramientas disponibles cuando sea necesario
             - Mantén el contexto de la conversación
-            - Los planes de financiamiento tienen tasa fija del 10 por ciento anual y plazos de 3-6 años
+            - Los planes de financiamiento tienen tasa fija del 10% anual y plazos de 3-6 años
             
             Herramientas disponibles:
             - propuesta_valor: Para información general sobre servicios y beneficios
