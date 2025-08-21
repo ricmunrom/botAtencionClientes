@@ -227,44 +227,45 @@ class AgentePrincipal:
         """
         for tool in self.tools:
             tool.telefono_actual = telefono_usuario
-    
+            
     def procesar_mensaje(self, mensaje: str, telefono_usuario: str) -> str:
-        """
-        Procesar mensaje del usuario y generar respuesta
+    """
+    Procesar mensaje del usuario y generar respuesta
+    """
+    try:
+        # Configurar tools para el usuario actual
+        self._configurar_tools_para_usuario(telefono_usuario)
         
-        Args:
-            mensaje: Mensaje del usuario
-            telefono_usuario: Número de teléfono del usuario
-            
-        Returns:
-            Respuesta del agente
-        """
-        try:
-            # Configurar tools para el usuario actual
-            self._configurar_tools_para_usuario(telefono_usuario)
-            
-            # Obtener estado del usuario
-            estado_usuario = self.gestor_estados.obtener_estado(telefono_usuario)
-            
-            # Registrar el mensaje en el historial del usuario
-            estado_usuario.actualizar('ultimo_mensaje', mensaje)
-            
-            # Ejecutar agente
-            respuesta = self.agent_executor.invoke({
-                "input": mensaje
-            })
-            
-            # Extraer respuesta final
-            respuesta_final = respuesta.get('output', 'Lo siento, no pude procesar tu mensaje.')
-            
-            # Registrar la respuesta en el estado del usuario
-            estado_usuario.actualizar('ultima_respuesta', respuesta_final)
-            
-            return respuesta_final
-            
-        except Exception as e:
-            print(f"Error procesando mensaje para {telefono_usuario}: {e}")
-            return "Lo siento, ocurrió un error procesando tu consulta. ¿Podrías intentar de nuevo?"
+        # Obtener estado del usuario
+        estado_usuario = self.gestor_estados.obtener_estado(telefono_usuario)
+        
+        # Registrar el mensaje en el historial del usuario
+        estado_usuario.actualizar('ultimo_mensaje', mensaje)
+        
+        print(f"🔍 DEBUG: Procesando mensaje: {mensaje}")
+        print(f"🔍 DEBUG: Tools disponibles: {[tool.name for tool in self.tools]}")
+        
+        # Ejecutar agente
+        respuesta = self.agent_executor.invoke({
+            "input": mensaje
+        })
+        
+        print(f"🔍 DEBUG: Respuesta completa del agente: {respuesta}")
+        print(f"🔍 DEBUG: Pasos intermedios: {respuesta.get('intermediate_steps', [])}")
+        
+        # Extraer respuesta final
+        respuesta_final = respuesta.get('output', 'Lo siento, no pude procesar tu mensaje.')
+        
+        # Registrar la respuesta en el estado del usuario
+        estado_usuario.actualizar('ultima_respuesta', respuesta_final)
+        
+        return respuesta_final
+        
+    except Exception as e:
+        print(f"❌ ERROR procesando mensaje para {telefono_usuario}: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Lo siento, ocurrió un error procesando tu consulta. ¿Podrías intentar de nuevo?"
     
     def obtener_estado_actual(self, telefono_usuario: str) -> Dict[str, Any]:
         """
