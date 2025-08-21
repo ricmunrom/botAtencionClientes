@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 class EstadoGlobal:
@@ -32,6 +32,8 @@ class EstadoGlobal:
             
             # Contexto de conversación
             'ultima_consulta': None,
+            'ultimo_mensaje': None,
+            'ultima_respuesta': None,
             'timestamp': datetime.now(),
             'historial_acciones': []
         }
@@ -158,6 +160,8 @@ class EstadoGlobal:
             'telefono': self._estado.get('cliente_telefono'),
             'auto_info': self.obtener_info_auto(),
             'financiamiento_info': self.obtener_info_financiamiento(),
+            'ultima_consulta': self._estado.get('ultima_consulta'),
+            'ultimo_mensaje': self._estado.get('ultimo_mensaje'),
             'timestamp': self._estado.get('timestamp'),
             'total_acciones': len(self._estado.get('historial_acciones', []))
         }
@@ -166,3 +170,112 @@ class EstadoGlobal:
         """Representación string del estado para debugging"""
         resumen = self.obtener_resumen()
         return f"EstadoGlobal({resumen})"
+
+
+class GestorEstados:
+    """
+    Gestor centralizado de estados por usuario.
+    Mantiene un estado separado para cada número de teléfono.
+    """
+    
+    def __init__(self):
+        """Inicializar gestor de estados"""
+        self._estados_usuarios: Dict[str, EstadoGlobal] = {}
+    
+    def obtener_estado(self, telefono: str) -> EstadoGlobal:
+        """
+        Obtener el estado para un usuario específico
+        
+        Args:
+            telefono: Número de teléfono del usuario
+            
+        Returns:
+            Estado global del usuario
+        """
+        if telefono not in self._estados_usuarios:
+            # Crear nuevo estado para usuario
+            self._estados_usuarios[telefono] = EstadoGlobal()
+            self._estados_usuarios[telefono].actualizar('cliente_telefono', telefono)
+            print(f"Nuevo estado creado para usuario: {telefono}")
+        
+        return self._estados_usuarios[telefono]
+    
+    def eliminar_estado(self, telefono: str) -> bool:
+        """
+        Eliminar estado de un usuario
+        
+        Args:
+            telefono: Número de teléfono del usuario
+            
+        Returns:
+            True si se eliminó, False si no existía
+        """
+        if telefono in self._estados_usuarios:
+            del self._estados_usuarios[telefono]
+            print(f"Estado eliminado para usuario: {telefono}")
+            return True
+        return False
+    
+    def reiniciar_estado(self, telefono: str) -> None:
+        """
+        Reiniciar estado de un usuario específico
+        
+        Args:
+            telefono: Número de teléfono del usuario
+        """
+        if telefono in self._estados_usuarios:
+            self._estados_usuarios[telefono].reiniciar()
+        else:
+            # Crear nuevo estado si no existe
+            self._estados_usuarios[telefono] = EstadoGlobal()
+            self._estados_usuarios[telefono].actualizar('cliente_telefono', telefono)
+    
+    def obtener_usuarios_activos(self) -> List[str]:
+        """
+        Obtener lista de usuarios con estados activos
+        
+        Returns:
+            Lista de números de teléfono con estados
+        """
+        return list(self._estados_usuarios.keys())
+    
+    def obtener_resumen_general(self) -> Dict[str, Any]:
+        """
+        Obtener resumen de todos los estados
+        
+        Returns:
+            Diccionario con información de todos los usuarios
+        """
+        return {
+            'total_usuarios': len(self._estados_usuarios),
+            'usuarios_activos': self.obtener_usuarios_activos(),
+            'estados_por_usuario': {
+                telefono: estado.obtener_resumen() 
+                for telefono, estado in self._estados_usuarios.items()
+            }
+        }
+    
+    def limpiar_estados_antiguos(self, horas: int = 24) -> int:
+        """
+        Limpiar estados de usuarios inactivos por más de X horas
+        
+        Args:
+            horas: Horas de inactividad para considerar estado antiguo
+            
+        Returns:
+            Número de estados eliminados
+        """
+        ahora = datetime.now()
+        estados_eliminar = []
+        
+        for telefono, estado in self._estados_usuarios.items():
+            ultimo_timestamp = estado.obtener('timestamp')
+            if ultimo_timestamp:
+                diferencia = ahora - ultimo_timestamp
+                if diferencia.total_seconds() > (horas * 3600):
+                    estados_eliminar.append(telefono)
+        
+        for telefono in estados_eliminar:
+            self.eliminar_estado(telefono)
+        
+        return len(estados_eliminar)

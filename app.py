@@ -1,4 +1,5 @@
-from flask import Flask, request, jsonify
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)from flask import Flask, request, jsonify
 import requests
 import os
 from dotenv import load_dotenv
@@ -160,7 +161,7 @@ class AtencionClientesBot:
         Returns:
             Diccionario con estado del agente
         """
-        return self.agente.obtener_estado_actual()
+        return self.agente.obtener_estado_actual(telefono)
     
     def reiniciar_conversacion(self, telefono: str) -> bool:
         """
@@ -244,5 +245,31 @@ def reiniciar_conversacion(telefono: str):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+@app.route('/resumen-general')
+def resumen_general():
+    """
+    Obtener resumen de todos los usuarios activos
+    Endpoint para monitoreo del sistema
+    """
+    try:
+        resumen = bot_atencion.agente.obtener_resumen_general()
+        return jsonify(resumen), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/limpiar-inactivos', methods=['POST'])
+def limpiar_usuarios_inactivos():
+    """
+    Limpiar usuarios inactivos por más de 24 horas
+    Endpoint para mantenimiento del sistema
+    """
+    try:
+        horas = request.json.get('horas', 24) if request.is_json else 24
+        usuarios_limpiados = bot_atencion.agente.limpiar_usuarios_inactivos(horas)
+        return jsonify({
+            "mensaje": f"Limpieza completada",
+            "usuarios_eliminados": usuarios_limpiados,
+            "horas_inactividad": horas
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
