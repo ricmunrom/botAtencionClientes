@@ -1,6 +1,6 @@
 import os
 from typing import Dict, Any, List, Optional
-from langchain.tools import BaseTool
+from langchain.tools import tool
 from langchain.agents import AgentExecutor, create_openai_functions_agent
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -8,102 +8,45 @@ from langchain.schema import BaseMessage
 from pydantic import BaseModel, Field
 from estado_global import EstadoGlobal
 
+# Variable global para estado (será inicializada por AgentePrincipal)
+_estado_global = None
 
-class PropuestaValorTool(BaseTool):
-    """
-    Tool para responder información básica sobre la propuesta de valor.
-    Proporciona información general sobre servicios, garantías, proceso de compra, etc.
-    """
+@tool
+def propuesta_valor(query: str) -> str:
+    """Proporciona información básica sobre la propuesta de valor, servicios, garantías y beneficios disponibles"""
+    global _estado_global
+    if _estado_global:
+        _estado_global.actualizar('ultima_consulta', f"propuesta_valor: {query}")
     
-    name: str = "propuesta_valor"
-    description: str = "Proporciona información básica sobre la propuesta de valor, servicios, garantías y beneficios disponibles"
-    estado_global: EstadoGlobal = Field(exclude=True)
+    # Por ahora solo pass - implementaremos lógica después
+    pass
     
-    def __init__(self, estado_global: EstadoGlobal, **kwargs):
-        super().__init__(estado_global=estado_global, **kwargs)
-    
-    def _run(self, query: str) -> str:
-        """
-        Ejecutar tool de propuesta de valor
-        
-        Args:
-            query: Consulta del usuario sobre información general
-            
-        Returns:
-            Respuesta con información de propuesta de valor
-        """
-        # Registrar la consulta en el estado global
-        self.estado_global.actualizar('ultima_consulta', f"propuesta_valor: {query}")
-        
-        # Por ahora solo pass - implementaremos lógica después
-        pass
-        
-        return "Información de propuesta de valor - En construcción"
+    return "Información de propuesta de valor - En construcción"
 
+@tool
+def catalogo_autos(preferencias: str) -> str:
+    """Busca y recomienda autos del catálogo basado en preferencias como presupuesto, marca, modelo, año, tipo de vehículo"""
+    global _estado_global
+    if _estado_global:
+        _estado_global.actualizar('ultima_consulta', f"catalogo: {preferencias}")
+        _estado_global.actualizar('cliente_preferencias', preferencias)
+    
+    # Por ahora solo pass - implementaremos lógica después
+    pass
+    
+    return "Recomendaciones de catálogo - En construcción"
 
-class CatalogoTool(BaseTool):
-    """
-    Tool para brindar recomendaciones de autos disponibles en el catálogo
-    según las preferencias del cliente.
-    """
+@tool
+def planes_financiamiento(parametros_financiamiento: str) -> str:
+    """Calcula planes de financiamiento basado en enganche, precio del auto, tasa de interés del 10% y plazos de 3 a 6 años"""
+    global _estado_global
+    if _estado_global:
+        _estado_global.actualizar('ultima_consulta', f"financiamiento: {parametros_financiamiento}")
     
-    name: str = "catalogo_autos"
-    description: str = "Busca y recomienda autos del catálogo basado en preferencias como presupuesto, marca, modelo, año, tipo de vehículo"
-    estado_global: EstadoGlobal = Field(exclude=True)
+    # Por ahora solo pass - implementaremos lógica después
+    pass
     
-    def __init__(self, estado_global: EstadoGlobal, **kwargs):
-        super().__init__(estado_global=estado_global, **kwargs)
-    
-    def _run(self, preferencias: str) -> str:
-        """
-        Ejecutar búsqueda en catálogo
-        
-        Args:
-            preferencias: Preferencias del cliente (presupuesto, marca, modelo, etc.)
-            
-        Returns:
-            Recomendaciones de autos del catálogo
-        """
-        # Registrar consulta y preferencias en estado global
-        self.estado_global.actualizar('ultima_consulta', f"catalogo: {preferencias}")
-        self.estado_global.actualizar('cliente_preferencias', preferencias)
-        
-        # Por ahora solo pass - implementaremos lógica después
-        pass
-        
-        return "Recomendaciones de catálogo - En construcción"
-
-
-class FinanzasTool(BaseTool):
-    """
-    Tool para calcular y otorgar planes de financiamiento.
-    Calcula pagos basado en enganche, precio del auto, tasa 10% y plazos 3-6 años.
-    """
-    
-    name: str = "planes_financiamiento"
-    description: str = "Calcula planes de financiamiento basado en enganche, precio del auto, tasa de interés del 10% y plazos de 3 a 6 años"
-    estado_global: EstadoGlobal = Field(exclude=True)
-    
-    def __init__(self, estado_global: EstadoGlobal, **kwargs):
-        super().__init__(estado_global=estado_global, **kwargs)
-    
-    def _run(self, parametros_financiamiento: str) -> str:
-        """
-        Calcular plan de financiamiento
-        
-        Args:
-            parametros_financiamiento: Parámetros como precio, enganche, plazo
-            
-        Returns:
-            Plan de financiamiento calculado
-        """
-        # Registrar consulta en estado global
-        self.estado_global.actualizar('ultima_consulta', f"financiamiento: {parametros_financiamiento}")
-        
-        # Por ahora solo pass - implementaremos lógica después
-        pass
-        
-        return "Plan de financiamiento - En construcción"
+    return "Plan de financiamiento - En construcción"
 
 
 class AgentePrincipal:
@@ -118,6 +61,10 @@ class AgentePrincipal:
         # Inicializar estado global
         self.estado_global = EstadoGlobal()
         
+        # Configurar variable global para las tools
+        global _estado_global
+        _estado_global = self.estado_global
+        
         # Inicializar modelo OpenAI
         self.llm = ChatOpenAI(
             model="gpt-3.5-turbo",
@@ -125,11 +72,11 @@ class AgentePrincipal:
             openai_api_key=os.getenv('OPENAI_API_KEY')
         )
         
-        # Inicializar tools
+        # Inicializar tools (ahora son funciones decoradas)
         self.tools = [
-            PropuestaValorTool(self.estado_global),
-            CatalogoTool(self.estado_global),
-            FinanzasTool(self.estado_global)
+            propuesta_valor,
+            catalogo_autos,
+            planes_financiamiento
         ]
         
         # Crear prompt del sistema
