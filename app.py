@@ -2,142 +2,247 @@ from flask import Flask, request, jsonify
 import requests
 import os
 from dotenv import load_dotenv
+from typing import Dict, Optional
+from agent import AgentePrincipal
 
 # Cargar variables de entorno
 load_dotenv()
 
+class AtencionClientesBot:
+    """
+    Bot de atención al cliente que integra WhatsApp Business API con agente LangChain
+    """
+    
+    def __init__(self):
+        """Inicializar el bot con configuraciones y agente"""
+        
+        # Configuración de WhatsApp Business API
+        self.verify_token = os.getenv('VERIFY_TOKEN', 'bot_atencion_2024')
+        self.page_access_token = os.getenv('PAGE_ACCESS_TOKEN')
+        self.phone_number_id = os.getenv('PHONE_NUMBER_ID')
+        
+        # Inicializar agente principal
+        self.agente = AgentePrincipal()
+        
+        # Validar configuración
+        if not self.page_access_token:
+            print("WARNING: PAGE_ACCESS_TOKEN no configurado")
+        if not self.phone_number_id:
+            print("WARNING: PHONE_NUMBER_ID no configurado")
+        if not os.getenv('OPENAI_API_KEY'):
+            print("WARNING: OPENAI_API_KEY no configurado")
+    
+    def verificar_webhook(self, mode: str, token: str, challenge: str) -> tuple:
+        """
+        Verificar webhook de WhatsApp Business
+        
+        Args:
+            mode: Modo de verificación
+            token: Token de verificación
+            challenge: Challenge code
+            
+        Returns:
+            Tupla (respuesta, código_status)
+        """
+        if mode == 'subscribe' and token == self.verify_token:
+            print("Webhook verificado exitosamente!")
+            return challenge, 200
+        else:
+            print("Verificación falló. Token incorrecto.")
+            return "Forbidden", 403
+    
+    def procesar_webhook_whatsapp(self, data: Dict) -> tuple:
+        """
+        Procesar webhook recibido de WhatsApp Business
+        
+        Args:
+            data: Datos del webhook
+            
+        Returns:
+            Tupla (respuesta, código_status)
+        """
+        try:
+            print(f"Webhook recibido: {data}")
+            
+            if data.get('object') == 'whatsapp_business_account':
+                for entry in data.get('entry', []):
+                    for change in entry.get('changes', []):
+                        if change.get('field') == 'messages':
+                            self._procesar_mensajes(change.get('value', {}))
+            
+            return "OK", 200
+            
+        except Exception as e:
+            print(f"Error procesando webhook: {e}")
+            return "Error", 500
+    
+    def _procesar_mensajes(self, value: Dict) -> None:
+        """
+        Procesar mensajes recibidos de WhatsApp
+        
+        Args:
+            value: Datos de los mensajes
+        """
+        if 'messages' not in value:
+            return
+        
+        for message in value['messages']:
+            # Obtener datos del mensaje
+            sender_phone = message.get('from')
+            message_id = message.get('id')
+            message_type = message.get('type', '')
+            
+            # Procesar solo mensajes de texto
+            if message_type == 'text':
+                message_text = message.get('text', {}).get('body', '')
+                
+                if message_text and sender_phone:
+                    print(f"Mensaje de {sender_phone}: {message_text}")
+                    
+                    # Procesar mensaje con el agente
+                    respuesta = self.agente.procesar_mensaje(message_text, sender_phone)
+                    
+                    # Enviar respuesta
+                    self.enviar_mensaje_whatsapp(sender_phone, respuesta)
+    
+    def enviar_mensaje_whatsapp(self, recipient_phone: str, message_text: str) -> bool:
+        """
+        Enviar mensaje a través de WhatsApp Business API
+        
+        Args:
+            recipient_phone: Teléfono del destinatario
+            message_text: Texto del mensaje
+            
+        Returns:
+            True si se envió exitosamente, False en caso contrario
+        """
+        if not self.page_access_token or not self.phone_number_id:
+            print("Error: Credenciales de WhatsApp no configuradas")
+            return False
+        
+        url = f"https://graph.facebook.com/v18.0/{self.phone_number_id}/messages"
+        
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": recipient_phone,
+            "type": "text",
+            "text": {
+                "body": message_text
+            }
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {self.page_access_token}",
+            "Content-Type": "application/json"
+        }
+        
+        try:
+            response = requests.post(url, json=payload, headers=headers)
+            
+            if response.status_code == 200:
+                print(f"WhatsApp mensaje enviado exitosamente a {recipient_phone}")
+                return True
+            else:
+                print(f"Error enviando WhatsApp mensaje: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            print(f"Excepción enviando WhatsApp mensaje: {e}")
+            return False
+    
+    def obtener_estado_agente(self, telefono: str) -> Dict:
+        """
+        Obtener estado actual del agente para un usuario
+        
+        Args:
+            telefono: Teléfono del usuario
+            
+        Returns:
+            Diccionario con estado del agente
+        """
+        return self.agente.obtener_estado_actual()
+    
+    def reiniciar_conversacion(self, telefono: str) -> bool:
+        """
+        Reiniciar conversación para un usuario específico
+        
+        Args:
+            telefono: Teléfono del usuario
+            
+        Returns:
+            True si se reinició exitosamente
+        """
+        try:
+            self.agente.reiniciar_conversacion(telefono)
+            return True
+        except Exception as e:
+            print(f"Error reiniciando conversación: {e}")
+            return False
+
+
+# Inicializar aplicación Flask
 app = Flask(__name__)
 
-# Configuración de WhatsApp Business API
-VERIFY_TOKEN = os.getenv('VERIFY_TOKEN', 'kavak_bot_2024')  # Cambia esto por un token único
-PAGE_ACCESS_TOKEN = os.getenv('PAGE_ACCESS_TOKEN')  # Token de tu página/WhatsApp Business
-PHONE_NUMBER_ID = os.getenv('PHONE_NUMBER_ID')  # ID del número de WhatsApp Business
+# Inicializar bot
+bot_atencion = AtencionClientesBot()
 
 @app.route('/')
 def home():
-    return "Kavak Bot está funcionando! 🚗", 200
+    """Endpoint de inicio"""
+    return "Bot de Atención al Cliente está funcionando! 🤖", 200
 
 @app.route('/webhook', methods=['GET'])
 def webhook_verify():
-    """Verificación del webhook para Facebook"""
-    # Obtener parámetros de la verificación
+    """Verificación del webhook para WhatsApp Business"""
     mode = request.args.get('hub.mode')
     token = request.args.get('hub.verify_token')
     challenge = request.args.get('hub.challenge')
     
-    # Verificar que el token coincida
-    if mode == 'subscribe' and token == VERIFY_TOKEN:
-        print("Webhook verificado exitosamente!")
-        return challenge, 200
-    else:
-        print("Verificación falló. Token incorrecto.")
-        return "Forbidden", 403
+    respuesta, status = bot_atencion.verificar_webhook(mode, token, challenge)
+    return respuesta, status
 
 @app.route('/webhook', methods=['POST'])
 def webhook_receive():
     """Recibir mensajes de WhatsApp Business"""
-    try:
-        data = request.get_json()
-        print(f"Webhook recibido: {data}")  # Debug: ver qué llega
-        
-        # WhatsApp Business API estructura
-        if data.get('object') == 'whatsapp_business_account':
-            for entry in data.get('entry', []):
-                for change in entry.get('changes', []):
-                    if change.get('field') == 'messages':
-                        value = change.get('value', {})
-                        
-                        # Verificar que hay mensajes
-                        if 'messages' in value:
-                            for message in value['messages']:
-                                # Obtener datos del mensaje
-                                sender_phone = message.get('from')
-                                message_id = message.get('id')
-                                message_type = message.get('type', '')
-                                
-                                # Obtener texto del mensaje
-                                message_text = ""
-                                if message_type == 'text':
-                                    message_text = message.get('text', {}).get('body', '')
-                                
-                                print(f"WhatsApp mensaje de {sender_phone}: {message_text} (tipo: {message_type})")
-                                
-                                # Responder solo a mensajes de texto
-                                if message_text:
-                                    send_whatsapp_message(sender_phone, f"¡Hola! Recibí tu mensaje: '{message_text}'. Soy el bot de Kavak y estoy funcionando! 🚗")
-        
-        return "OK", 200
-    
-    except Exception as e:
-        print(f"Error procesando webhook: {e}")
-        return "Error", 500
-
-def send_whatsapp_message(recipient_phone, message_text):
-    """Enviar mensaje a través de WhatsApp Business API"""
-    if not PAGE_ACCESS_TOKEN:
-        print("Error: PAGE_ACCESS_TOKEN no configurado")
-        return False
-    
-    # Obtener el Phone Number ID (necesario para WhatsApp)
-    # Este valor lo obtienes de Facebook Developers > WhatsApp > Getting Started
-    PHONE_NUMBER_ID = os.getenv('PHONE_NUMBER_ID', 'tu_phone_number_id_aqui')
-    
-    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
-    
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": recipient_phone,
-        "type": "text",
-        "text": {
-            "body": message_text
-        }
-    }
-    
-    headers = {
-        "Authorization": f"Bearer {PAGE_ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    
-    try:
-        response = requests.post(url, json=payload, headers=headers)
-        if response.status_code == 200:
-            print(f"WhatsApp mensaje enviado exitosamente a {recipient_phone}")
-            return True
-        else:
-            print(f"Error enviando WhatsApp mensaje: {response.status_code} - {response.text}")
-            return False
-    except Exception as e:
-        print(f"Excepción enviando WhatsApp mensaje: {e}")
-        return False
-
-def send_message(recipient_id, message_text):
-    """Enviar mensaje a través de Facebook Messenger (legacy)"""
-    if not PAGE_ACCESS_TOKEN:
-        print("Error: PAGE_ACCESS_TOKEN no configurado")
-        return False
-    
-    url = f"https://graph.facebook.com/v18.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
-    
-    payload = {
-        "recipient": {"id": recipient_id},
-        "message": {"text": message_text}
-    }
-    
-    headers = {"Content-Type": "application/json"}
-    
-    try:
-        response = requests.post(url, json=payload, headers=headers)
-        if response.status_code == 200:
-            print(f"Mensaje enviado exitosamente a {recipient_id}")
-            return True
-        else:
-            print(f"Error enviando mensaje: {response.status_code} - {response.text}")
-            return False
-    except Exception as e:
-        print(f"Excepción enviando mensaje: {e}")
-        return False
+    data = request.get_json()
+    respuesta, status = bot_atencion.procesar_webhook_whatsapp(data)
+    return respuesta, status
 
 @app.route('/health')
 def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "service": "kavak-bot"}, 200
+    return {
+        "status": "healthy", 
+        "service": "atencion-clientes-bot",
+        "agent_status": "initialized"
+    }, 200
+
+@app.route('/estado/<telefono>')
+def obtener_estado(telefono: str):
+    """
+    Obtener estado actual del agente para un usuario
+    Endpoint para debugging/monitoreo
+    """
+    try:
+        estado = bot_atencion.obtener_estado_agente(telefono)
+        return jsonify(estado), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/reiniciar/<telefono>', methods=['POST'])
+def reiniciar_conversacion(telefono: str):
+    """
+    Reiniciar conversación para un usuario
+    Endpoint para debugging/administración
+    """
+    try:
+        exito = bot_atencion.reiniciar_conversacion(telefono)
+        if exito:
+            return jsonify({"mensaje": "Conversación reiniciada exitosamente"}), 200
+        else:
+            return jsonify({"error": "No se pudo reiniciar la conversación"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
