@@ -6,3 +6,6 @@ venv/
 
 # Docker
 .dockerignore
+
+#pycache
+__pycache__
