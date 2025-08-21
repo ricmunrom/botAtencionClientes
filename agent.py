@@ -236,7 +236,7 @@ class FinanzasTool(BaseTool):
     """
     
     name: str = "planes_financiamiento"
-    description: str = "Calcula planes de financiamiento basado en enganche, precio del auto, tasa de interés del 10% y plazos de 3 a 6 años"
+    description: str = "Calcula planes de financiamiento para autos con tasa fija del 10% anual y plazos de 3, 4, 5 o 6 años. Usa esta tool cuando el usuario pregunte sobre financiamiento, pagos mensuales, enganches, o planes de pago para un auto."
     gestor_estados: GestorEstados = Field(exclude=True)
     telefono_actual: str = Field(exclude=True)
     
@@ -253,17 +253,193 @@ class FinanzasTool(BaseTool):
         Returns:
             Plan de financiamiento calculado
         """
-        # Obtener el estado del usuario actual
-        estado = self.gestor_estados.obtener_estado(self.telefono_actual)
+        try:
+            # Obtener el estado del usuario actual
+            estado = self.gestor_estados.obtener_estado(self.telefono_actual)
+            
+            # Registrar consulta en estado global
+            estado.actualizar('ultima_consulta', f"financiamiento: {parametros_financiamiento}")
+            estado.actualizar('tipo_consulta', 'calculo_financiamiento')
+            
+            print(f"🔍 DEBUG FinanzasTool: Calculando financiamiento con: {parametros_financiamiento}")
+            
+            # Obtener precio del auto seleccionado
+            auto_precio = estado.obtener('auto_precio')
+            auto_info = estado.obtener_info_auto_completa()
+            
+            if not auto_precio:
+                return self._respuesta_sin_auto_seleccionado()
+            
+            # Extraer enganche del texto
+            enganche_especificado = self._extraer_enganche(parametros_financiamiento, auto_precio)
+            
+            print(f"🔍 DEBUG FinanzasTool: Precio auto: ${auto_precio:,.0f}, Enganche: {enganche_especificado}")
+            
+            # Generar planes de financiamiento
+            if enganche_especificado:
+                # Si especificó enganche, calcular para ese enganche específico
+                respuesta = self._generar_plan_especifico(auto_info, auto_precio, enganche_especificado)
+                
+                # Guardar en estado
+                estado.actualizar('enganche', enganche_especificado)
+                
+            else:
+                # Si no especificó enganche, mostrar múltiples opciones
+                respuesta = self._generar_opciones_multiples(auto_info, auto_precio)
+            
+            # Registrar que se proporcionó financiamiento
+            estado.actualizar('ultima_respuesta_tipo', 'planes_financiamiento')
+            
+            return respuesta
+            
+        except Exception as e:
+            print(f"❌ ERROR en FinanzasTool: {e}")
+            import traceback
+            traceback.print_exc()
+            return "Disculpa, ocurrió un error al calcular el financiamiento. ¿Podrías proporcionar más detalles sobre el enganche que tienes disponible?"
+    
+    def _respuesta_sin_auto_seleccionado(self) -> str:
+        """Respuesta cuando no hay auto seleccionado"""
+        return """Para calcular tu financiamiento necesito que primero selecciones un auto.
         
-        # Registrar consulta en estado global
-        estado.actualizar('ultima_consulta', f"financiamiento: {parametros_financiamiento}")
-        
-        # Por ahora solo pass - implementaremos lógica después
-        pass
-        
-        return "Plan de financiamiento - En construcción"
+🔍 Puedes buscar autos diciendo algo como:
+• "Quiero un Toyota con presupuesto de 300000"
+• "Muéstrame autos del 2020"
+• "Busco un auto con bluetooth"
 
+Una vez que selecciones un auto, podremos calcular las opciones de financiamiento perfectas para ti."""
+    
+    def _extraer_enganche(self, texto: str, precio_auto: float) -> Optional[float]:
+        """
+        Extraer enganche del texto del usuario
+        
+        Args:
+            texto: Texto con parámetros de financiamiento
+            precio_auto: Precio del auto para calcular porcentajes
+            
+        Returns:
+            Monto del enganche o None si no se especifica
+        """
+        texto_lower = texto.lower()
+        
+        # Buscar monto específico
+        import re
+        patron_monto = r'(\d{1,3}(?:,?\d{3})*(?:\.\d{2})?)\s*(?:pesos|mx|mxn|de enganche|enganche)?'
+        montos = re.findall(patron_monto, texto_lower.replace(',', ''))
+        
+        if montos:
+            try:
+                monto = float(montos[0].replace(',', ''))
+                # Si es menor a 1000, probablemente son miles
+                if monto < 1000:
+                    monto *= 1000
+                
+                # Validar que el enganche no sea mayor al precio del auto
+                if monto <= precio_auto:
+                    return monto
+            except:
+                pass
+        
+        # Buscar porcentaje
+        patron_porcentaje = r'(\d{1,2})\s*%'
+        porcentajes = re.findall(patron_porcentaje, texto_lower)
+        
+        if porcentajes:
+            try:
+                porcentaje = float(porcentajes[0]) / 100
+                if 0.05 <= porcentaje <= 0.80:  # Entre 5% y 80%
+                    return precio_auto * porcentaje
+            except:
+                pass
+        
+        return None
+    
+    def _calcular_pago_mensual(self, monto_financiar: float, años: int) -> float:
+        """
+        Calcular pago mensual con fórmula de financiamiento
+        
+        Args:
+            monto_financiar: Monto a financiar
+            años: Años del plazo
+            
+        Returns:
+            Pago mensual
+        """
+        if monto_financiar <= 0:
+            return 0
+        
+        tasa_anual = 0.10  # 10% fijo
+        tasa_mensual = tasa_anual / 12
+        num_pagos = años * 12
+        
+        # Fórmula de financiamiento: PMT = [P × r × (1 + r)^n] / [(1 + r)^n - 1]
+        if tasa_mensual == 0:
+            return monto_financiar / num_pagos
+        
+        factor = (1 + tasa_mensual) ** num_pagos
+        pago_mensual = (monto_financiar * tasa_mensual * factor) / (factor - 1)
+        
+        return pago_mensual
+    
+    def _generar_plan_especifico(self, auto_info: Dict, precio_auto: float, enganche: float) -> str:
+        """Generar plan para enganche específico"""
+        monto_financiar = precio_auto - enganche
+        auto_descripcion = f"{auto_info.get('marca', 'N/A')} {auto_info.get('modelo', 'N/A')} {auto_info.get('año', 'N/A')}"
+        
+        respuesta = f"""💰 **Plan de financiamiento para {auto_descripcion}**
+
+🚗 Precio del auto: ${precio_auto:,.0f} MXN
+💵 Enganche: ${enganche:,.0f} MXN ({enganche/precio_auto*100:.1f}%)
+🏦 Monto a financiar: ${monto_financiar:,.0f} MXN
+📊 Tasa de interés: 10% anual
+
+**Opciones de pago mensual:**
+"""
+        
+        for años in [3, 4, 5, 6]:
+            pago_mensual = self._calcular_pago_mensual(monto_financiar, años)
+            total_pagos = pago_mensual * años * 12
+            total_intereses = total_pagos - monto_financiar
+            
+            respuesta += f"""
+⏱️ **{años} años ({años * 12} mensualidades)**
+   💳 Pago mensual: ${pago_mensual:,.0f} MXN
+   💰 Total a pagar: ${total_pagos:,.0f} MXN
+   📈 Total intereses: ${total_intereses:,.0f} MXN
+"""
+        
+        respuesta += "\n¿Te interesa alguna de estas opciones? ¡Puedo ayudarte con los siguientes pasos!"
+        
+        return respuesta
+    
+    def _generar_opciones_multiples(self, auto_info: Dict, precio_auto: float) -> str:
+        """Generar múltiples opciones de enganche"""
+        auto_descripcion = f"{auto_info.get('marca', 'N/A')} {auto_info.get('modelo', 'N/A')} {auto_info.get('año', 'N/A')}"
+        
+        respuesta = f"""💰 **Opciones de financiamiento para {auto_descripcion}**
+🚗 Precio: ${precio_auto:,.0f} MXN | 📊 Tasa: 10% anual
+
+"""
+        
+        # Opciones de enganche: 10%, 20%, 30%
+        enganches = [0.10, 0.20, 0.30]
+        
+        for porcentaje_enganche in enganches:
+            enganche = precio_auto * porcentaje_enganche
+            monto_financiar = precio_auto - enganche
+            
+            respuesta += f"""**💵 Con {porcentaje_enganche*100:.0f}% de enganche (${enganche:,.0f} MXN):**
+"""
+            
+            for años in [3, 4, 5, 6]:
+                pago_mensual = self._calcular_pago_mensual(monto_financiar, años)
+                respuesta += f"   • {años} años: ${pago_mensual:,.0f}/mes\n"
+            
+            respuesta += "\n"
+        
+        respuesta += "💡 ¿Qué enganche y plazo te conviene más? Puedo darte más detalles de cualquier opción."
+        
+        return respuesta
 
 class AgentePrincipal:
     """
