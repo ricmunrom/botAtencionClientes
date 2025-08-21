@@ -119,6 +119,15 @@ class CatalogoTool(BaseTool):
                 
                 print(f"🔍 DEBUG CatalogoTool: Filtros aplicados: {filtros_aplicados}")
             
+            # Detectar si el usuario muestra interés específico en un auto
+            if autos_encontrados:
+                auto_especifico = self._detectar_auto_especifico(preferencias, autos_encontrados)
+                
+                if auto_especifico:
+                    # Guardar el auto específico en el estado
+                    estado.actualizar_auto_seleccionado(auto_especifico)
+                    print(f"🔍 DEBUG CatalogoTool: Auto específico guardado: {auto_especifico.get('make')} {auto_especifico.get('model')} {auto_especifico.get('year')}")
+            
             # Formatear respuesta
             respuesta_formateada = formatear_lista_autos(autos_encontrados)
             
@@ -146,7 +155,80 @@ class CatalogoTool(BaseTool):
             import traceback
             traceback.print_exc()
             return "Disculpa, ocurrió un error al buscar en el catálogo. ¿Podrías reformular tu búsqueda o ser más específico sobre qué tipo de auto buscas?"
+    
+    def _detectar_auto_especifico(self, preferencias: str, autos_encontrados: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """
+        Detectar si el usuario está preguntando por un auto específico
+        
+        Args:
+            preferencias: Texto de preferencias del usuario
+            autos_encontrados: Lista de autos encontrados
             
+        Returns:
+            Auto específico si se detecta interés, None en caso contrario
+        """
+        if not autos_encontrados:
+            return None
+        
+        preferencias_lower = preferencias.lower()
+        
+        # Detectar palabras que indican interés específico
+        palabras_interes = [
+            'quiero el', 'me interesa el', 'detalles del', 'información del',
+            'dime sobre el', 'cuéntame del', 'ese auto', 'este auto',
+            'quiero detalles', 'más información', 'me gusta el'
+        ]
+        
+        # Si hay indicadores de interés específico
+        for palabra in palabras_interes:
+            if palabra in preferencias_lower:
+                print(f"🔍 DEBUG: Detectada palabra de interés: {palabra}")
+                
+                # Si solo hay un auto encontrado, ese es el de interés
+                if len(autos_encontrados) == 1:
+                    print(f"🔍 DEBUG: Solo un auto encontrado, seleccionando automáticamente")
+                    return autos_encontrados[0]
+                
+                # Si hay múltiples, buscar coincidencia específica en el texto
+                for auto in autos_encontrados:
+                    auto_descripcion = f"{auto.get('make', '')} {auto.get('model', '')}".lower()
+                    if auto_descripcion in preferencias_lower:
+                        print(f"🔍 DEBUG: Coincidencia específica encontrada: {auto_descripcion}")
+                        return auto
+                
+                # Si no encuentra específico pero hay indicador de interés, tomar el primero
+                print(f"🔍 DEBUG: Palabra de interés pero sin coincidencia específica, tomando el primero")
+                return autos_encontrados[0]
+        
+        # Buscar modelo específico en las preferencias
+        for auto in autos_encontrados:
+            modelo = auto.get('model', '').lower()
+            marca = auto.get('make', '').lower()
+            año = str(auto.get('year', ''))
+            
+            # Verificar si menciona modelo específico
+            if modelo in preferencias_lower and len(preferencias_lower.split()) <= 5:
+                print(f"🔍 DEBUG: Modelo específico mencionado: {modelo}")
+                return auto
+            
+            # Verificar si menciona marca + modelo
+            if f"{marca} {modelo}" in preferencias_lower:
+                print(f"🔍 DEBUG: Marca + modelo mencionados: {marca} {modelo}")
+                return auto
+            
+            # Verificar si menciona modelo + año
+            if modelo in preferencias_lower and año in preferencias_lower:
+                print(f"🔍 DEBUG: Modelo + año mencionados: {modelo} {año}")
+                return auto
+        
+        # Si la búsqueda es muy específica (pocas palabras) y hay pocos resultados
+        if len(preferencias.split()) <= 3 and len(autos_encontrados) <= 2:
+            print(f"🔍 DEBUG: Búsqueda específica con pocos resultados")
+            return autos_encontrados[0]
+        
+        print(f"🔍 DEBUG: No se detectó interés específico")
+        return None
+
 class FinanzasTool(BaseTool):
     """
     Tool para calcular y otorgar planes de financiamiento.
