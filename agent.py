@@ -278,10 +278,7 @@ class FinanzasTool(BaseTool):
             # Generar planes de financiamiento
             if enganche_especificado:
                 # Si especificó enganche, calcular para ese enganche específico
-                respuesta = self._generar_plan_especifico(auto_info, auto_precio, enganche_especificado)
-                
-                # Guardar en estado
-                estado.actualizar('enganche', enganche_especificado)
+                respuesta = self._generar_plan_especifico(auto_info, auto_precio, enganche_especificado, parametros_financiamiento)
                 
             else:
                 # Si no especificó enganche, mostrar múltiples opciones
@@ -354,6 +351,41 @@ Una vez que selecciones un auto, podremos calcular las opciones de financiamient
         
         return None
     
+    def _extraer_plazo(self, texto: str) -> Optional[int]:
+        """
+        Extraer plazo específico del texto
+        
+        Args:
+            texto: Texto con parámetros de financiamiento
+            
+        Returns:
+            Plazo en años o None
+        """
+        import re
+        texto_lower = texto.lower()
+        
+        # Buscar patrones como "3 años", "a 4 años", "financiar a 5 años"
+        patrones_plazo = [
+            r'(\d)\s*años?',
+            r'a\s*(\d)\s*años?',
+            r'financiar\s*a\s*(\d)\s*años?',
+            r'plazo\s*de\s*(\d)\s*años?'
+        ]
+        
+        for patron in patrones_plazo:
+            matches = re.findall(patron, texto_lower)
+            if matches:
+                try:
+                    plazo = int(matches[0])
+                    # Validar que esté en el rango permitido (3-6 años)
+                    if 3 <= plazo <= 6:
+                        print(f"🔍 DEBUG: Plazo específico detectado: {plazo} años")
+                        return plazo
+                except:
+                    pass
+        
+        return None
+    
     def _calcular_pago_mensual(self, monto_financiar: float, años: int) -> float:
         """
         Calcular pago mensual con fórmula de financiamiento
@@ -381,12 +413,46 @@ Una vez que selecciones un auto, podremos calcular las opciones de financiamient
         
         return pago_mensual
     
-    def _generar_plan_especifico(self, auto_info: Dict, precio_auto: float, enganche: float) -> str:
+    def _generar_plan_especifico(self, auto_info: Dict, precio_auto: float, enganche: float, parametros_financiamiento: str) -> str:
         """Generar plan para enganche específico"""
         monto_financiar = precio_auto - enganche
         auto_descripcion = f"{auto_info.get('marca', 'N/A')} {auto_info.get('modelo', 'N/A')} {auto_info.get('año', 'N/A')}"
         
-        respuesta = f"""💰 **Plan de financiamiento para {auto_descripcion}**
+        # Verificar si se especificó un plazo específico
+        plazo_especifico = self._extraer_plazo(parametros_financiamiento)
+        
+        if plazo_especifico:
+            # Plan específico para un plazo
+            pago_mensual = self._calcular_pago_mensual(monto_financiar, plazo_especifico)
+            total_pagos = pago_mensual * plazo_especifico * 12
+            total_intereses = total_pagos - monto_financiar
+            
+            respuesta = f"""💰 **Plan de financiamiento para {auto_descripcion}**
+
+🚗 Precio del auto: ${precio_auto:,.0f} MXN
+💵 Enganche: ${enganche:,.0f} MXN ({enganche/precio_auto*100:.1f}%)
+🏦 Monto a financiar: ${monto_financiar:,.0f} MXN
+📊 Tasa de interés: 10% anual
+
+⏱️ **Financiamiento a {plazo_especifico} años ({plazo_especifico * 12} mensualidades)**
+💳 Pago mensual: ${pago_mensual:,.0f} MXN
+💰 Total a pagar: ${total_pagos:,.0f} MXN
+📈 Total intereses: ${total_intereses:,.0f} MXN
+
+¿Te interesa esta opción? ¡Puedo ayudarte con los siguientes pasos!"""
+            
+            # Guardar todos los valores en el estado
+            estado = self.gestor_estados.obtener_estado(self.telefono_actual)
+            estado.actualizar('enganche', enganche)
+            estado.actualizar('monto_financiar', monto_financiar)
+            estado.actualizar('plazo_años', plazo_especifico)
+            estado.actualizar('pago_mensual', pago_mensual)
+            
+            print(f"🔍 DEBUG: Guardado en estado - Enganche: ${enganche:,.0f}, Plazo: {plazo_especifico} años, Pago mensual: ${pago_mensual:,.0f}")
+            
+        else:
+            # Plan con múltiples opciones de plazo
+            respuesta = f"""💰 **Plan de financiamiento para {auto_descripcion}**
 
 🚗 Precio del auto: ${precio_auto:,.0f} MXN
 💵 Enganche: ${enganche:,.0f} MXN ({enganche/precio_auto*100:.1f}%)
@@ -395,20 +461,25 @@ Una vez que selecciones un auto, podremos calcular las opciones de financiamient
 
 **Opciones de pago mensual:**
 """
-        
-        for años in [3, 4, 5, 6]:
-            pago_mensual = self._calcular_pago_mensual(monto_financiar, años)
-            total_pagos = pago_mensual * años * 12
-            total_intereses = total_pagos - monto_financiar
             
-            respuesta += f"""
+            for años in [3, 4, 5, 6]:
+                pago_mensual = self._calcular_pago_mensual(monto_financiar, años)
+                total_pagos = pago_mensual * años * 12
+                total_intereses = total_pagos - monto_financiar
+                
+                respuesta += f"""
 ⏱️ **{años} años ({años * 12} mensualidades)**
    💳 Pago mensual: ${pago_mensual:,.0f} MXN
    💰 Total a pagar: ${total_pagos:,.0f} MXN
    📈 Total intereses: ${total_intereses:,.0f} MXN
 """
-        
-        respuesta += "\n¿Te interesa alguna de estas opciones? ¡Puedo ayudarte con los siguientes pasos!"
+            
+            respuesta += "\n¿Te interesa alguna de estas opciones? ¡Puedo ayudarte con los siguientes pasos!"
+            
+            # Solo guardar enganche cuando no hay plazo específico
+            estado = self.gestor_estados.obtener_estado(self.telefono_actual)
+            estado.actualizar('enganche', enganche)
+            estado.actualizar('monto_financiar', monto_financiar)
         
         return respuesta
     
