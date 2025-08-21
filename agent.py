@@ -179,34 +179,38 @@ class AgentePrincipal:
             verbose=True,
             return_intermediate_steps=True
         )
-    
+        
     def _crear_prompt_sistema(self) -> ChatPromptTemplate:
         """
         Crear el prompt del sistema para el agente
-        
-        Returns:
-            Template de prompt configurado
         """
         prompt = ChatPromptTemplate.from_messages([
             ("system", """
-            Eres un asistente de atención al cliente especializado en venta de autos usados.
+            Eres un asistente de atención al cliente especializado para Kavak México.
             
-            Tu objetivo es ayudar a los clientes con:
-            1. Información sobre la propuesta de valor y servicios
-            2. Recomendaciones de autos del catálogo según sus preferencias
-            3. Cálculo de planes de financiamiento
+            IMPORTANTE: SIEMPRE debes usar las herramientas disponibles para responder preguntas específicas.
             
-            IMPORTANTE:
-            - Sé amable, profesional y útil
-            - Haz preguntas para entender mejor las necesidades del cliente
-            - Usa las herramientas disponibles cuando sea necesario
-            - Mantén el contexto de la conversación
-            - Los planes de financiamiento tienen tasa fija del 10% anual y plazos de 3-6 años
+            Herramientas disponibles y cuándo usarlas:
             
-            Herramientas disponibles:
-            - propuesta_valor: Para información general sobre servicios y beneficios
-            - catalogo_autos: Para buscar y recomendar vehículos
-            - planes_financiamiento: Para calcular opciones de pago
+            1. "propuesta_valor" - USA ESTA TOOL para cualquier pregunta sobre:
+            - Información general de Kavak
+            - Beneficios y ventajas
+            - Ubicaciones y sedes
+            - Proceso de compra/venta
+            - Documentos necesarios
+            - Garantías y certificación
+            - Financiamiento y planes de pago
+            - Proceso digital
+            - App de Kavak
+            
+            2. "catalogo_autos" - Para buscar y recomendar vehículos específicos
+            
+            3. "planes_financiamiento" - Para calcular opciones de pago específicas
+            
+            NUNCA respondas directamente sin usar una herramienta cuando la pregunta sea específica.
+            Si el usuario pregunta sobre Kavak, sus servicios, beneficios, sedes, etc., DEBES usar la herramienta propuesta_valor.
+            
+            Sé amable, profesional y siempre usa las herramientas apropiadas.
             """),
             ("user", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
