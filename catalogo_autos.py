@@ -152,10 +152,10 @@ class CatalogoAutos:
         
         # PASO 5: Características específicas
         if 'bluetooth' in texto_lower:
-            filtros['bluetooth'] = 'Yes'
+            filtros['bluetooth'] = 'Sí'
             print(f"DEBUG: Bluetooth requerido")
         if 'carplay' in texto_lower or 'car play' in texto_lower:
-            filtros['car_play'] = 'Yes'
+            filtros['car_play'] = 'Sí'
             print(f"DEBUG: CarPlay requerido")
         
         print(f"DEBUG: Filtros finales extraídos: {filtros}")
@@ -285,8 +285,8 @@ class CatalogoAutos:
                 'min': self.df['year'].min(),
                 'max': self.df['year'].max()
             },
-            'autos_con_bluetooth': len(self.df[self.df['bluetooth'] == 'Yes']),
-            'autos_con_carplay': len(self.df[self.df['car_play'] == 'Yes'])
+            'autos_con_bluetooth': len(self.df[self.df['bluetooth'] == 'Sí']),
+            'autos_con_carplay': len(self.df[self.df['car_play'] == 'Sí'])
         }
 
 
@@ -306,8 +306,8 @@ def formatear_auto_para_respuesta(auto: Dict[str, Any]) -> str:
     info_auto = f"""**{auto.get('make', 'N/A')} {auto.get('model', 'N/A')} {auto.get('year', 'N/A')}**
                 Precio: {precio_formateado}
                 Kilometraje: {km_formateado}
-                Bluetooth: {'Sí' if auto.get('bluetooth') == 'Yes' else 'No'}
-                CarPlay: {'Sí' if auto.get('car_play') == 'Yes' else 'No'}
+                Bluetooth: {'Sí' if auto.get('bluetooth') == 'Sí' else 'No'}
+                CarPlay: {'Sí' if auto.get('car_play') == 'Sí' else 'No'}
                 Versión: {auto.get('version', 'N/A')}
                 ID: {auto.get('stock_id', 'N/A')}"""
     

@@ -273,16 +273,16 @@ class CatalogoTool(BaseTool):
     Precio: {precio_formateado}
     Kilometraje: {km_formateado}
     Versión: {auto.get('version', 'N/A')}
-    Bluetooth: {'Sí' if auto.get('bluetooth') == 'Yes' else 'No'}
-    CarPlay: {'Sí' if auto.get('car_play') == 'Yes' else 'No'}"""
+    Bluetooth: {'Sí' if auto.get('bluetooth') == 'Sí' else 'No'}
+    CarPlay: {'Sí' if auto.get('car_play') == 'Sí' else 'No'}"""
         
         # Agregar información específica según la consulta
         if 'bluetooth' in consulta_lower:
-            bluetooth_status = 'Sí' if auto.get('bluetooth') == 'Yes' else 'No'
+            bluetooth_status = 'Sí' if auto.get('bluetooth') == 'Sí' else 'No'
             respuesta += f"\n\nBluetooth: {bluetooth_status}"
         
         if 'carplay' in consulta_lower or 'car play' in consulta_lower:
-            carplay_status = 'Sí' if auto.get('car_play') == 'Yes' else 'No'
+            carplay_status = 'Sí' if auto.get('car_play') == 'Sí' else 'No'
             respuesta += f"\n\nCarPlay: {carplay_status}"
         
         if 'dimensiones' in consulta_lower:
