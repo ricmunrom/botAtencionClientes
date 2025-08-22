@@ -39,7 +39,6 @@ Implementación de seguridad de nivel enterprise para la gestión de variables d
 ### 📱 **Integración WhatsApp**
 - WhatsApp Business API completamente integrada
 - Manejo de webhooks entrantes y salientes
-- Soporte para múltiples usuarios simultáneos
 - Confirmación de entrega de mensajes
 
 ### 🚗 **Funcionalidades de Negocio**
@@ -61,8 +60,7 @@ botAtencionClientes/
 ├── docker-compose.yml          # Configuración de contenedores
 ├── Dockerfile                  # Imagen del bot
 ├── requirements.txt            # Dependencias de Python
-├── wsgi.py                     # Configuración WSGI para producción
-└── logs/                       # Directorio de logs del sistema
+└── wsgi.py                     # Configuración WSGI para producción
 ```
 
 ## 🚀 Instalación y Configuración
