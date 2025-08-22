@@ -1,6 +1,6 @@
-# 🤖 Bot de Atención al Cliente - Kavak
+# 🤖 Bot Demostrativo de Atención al Cliente - Kavak Challenge
 
-Un chatbot inteligente de atención al cliente para WhatsApp Business API, desarrollado con Flask, LangChain y OpenAI. Proporciona información sobre la propuesta de valor de Kavak, búsqueda en catálogo de vehículos y cálculo de planes de financiamiento.
+Un chatbot inteligente de atención al cliente para el canal de WhatsApp Business API, desarrollado con Flask, LangChain y OpenAI. Proporciona información sobre la propuesta de valor de Kavak, búsqueda en catálogo de vehículos y cálculo de planes de financiamiento.
 
 ## 🏗️ Arquitectura del Sistema
 
