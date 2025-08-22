@@ -68,48 +68,47 @@ class CalculadoraFinanciamiento:
 
 def extraer_enganche(texto: str, precio_auto: float) -> Optional[float]:
     """
-    Extraer enganche del texto del usuario
-    
-    Args:
-        texto: Texto con parámetros de financiamiento
-        precio_auto: Precio del auto para calcular porcentajes
-        
-    Returns:
-        Monto del enganche o None si no se especifica
+    Extraer enganche del texto del usuario - VERSIÓN MEJORADA
     """
     texto_lower = texto.lower()
     
-    # Buscar monto específico
-    patron_monto = r'(\d{1,3}(?:,?\d{3})*(?:\.\d{2})?)\s*(?:pesos|mx|mxn|de enganche|enganche)?'
+    # PRIMERO: Buscar patrones específicos de enganche
+    patrones_enganche = [
+        r'enganche\s*de\s*(\d{1,3}(?:,?\d{3})*)',
+        r'dando\s*un\s*enganche\s*de\s*(\d{1,3}(?:,?\d{3})*)',
+        r'con\s*(\d{1,3}(?:,?\d{3})*)\s*de\s*enganche',
+        r'(\d{1,3}(?:,?\d{3})*)\s*pesos.*enganche'
+    ]
+    
+    for patron in patrones_enganche:
+        matches = re.findall(patron, texto_lower.replace(',', ''))
+        if matches:
+            try:
+                monto = float(matches[0].replace(',', ''))
+                if monto <= precio_auto:
+                    print(f"DEBUG: Enganche encontrado con patrón específico: {monto}")
+                    return monto
+            except:
+                continue
+    
+    # FALLBACK: Tu lógica original solo si no encuentra nada específico
+    patron_monto = r'(\d{1,3}(?:,?\d{3})*(?:\.\d{2})?)\s*(?:pesos|mx|mxn)'
     montos = re.findall(patron_monto, texto_lower.replace(',', ''))
     
     if montos:
         try:
             monto = float(montos[0].replace(',', ''))
-            # Si es menor a 1000, probablemente son miles
             if monto < 1000:
                 monto *= 1000
-            
-            # Validar que el enganche no sea mayor al precio del auto
             if monto <= precio_auto:
+                print(f"DEBUG: Enganche encontrado con patrón fallback: {monto}")
                 return monto
         except:
             pass
     
-    # Buscar porcentaje
-    patron_porcentaje = r'(\d{1,2})\s*%'
-    porcentajes = re.findall(patron_porcentaje, texto_lower)
-    
-    if porcentajes:
-        try:
-            porcentaje = float(porcentajes[0]) / 100
-            if 0.05 <= porcentaje <= 0.80:  # Entre 5% y 80%
-                return precio_auto * porcentaje
-        except:
-            pass
-    
+    print("DEBUG: No se encontró enganche válido")
     return None
-
+    
 def extraer_plazo(texto: str) -> Optional[int]:
     """
     Extraer plazo específico del texto
@@ -254,5 +253,5 @@ def generar_mensaje_sin_auto() -> str:
             • "Quiero un Toyota con presupuesto de 300000"
             • "Muéstrame autos del 2020"
             • "Busco un auto con bluetooth"
-            
+
             Una vez que selecciones un auto, podremos calcular las opciones de financiamiento perfectas para ti."""
