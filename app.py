@@ -186,7 +186,7 @@ class AtencionClientesBot:
         Returns:
             Diccionario con información de todos los usuarios
         """
-        return self.gestor_estados.obtener_resumen_general()
+        return self.agente.gestor_estados.obtener_resumen_general()
     
     def limpiar_usuarios_inactivos(self, horas: int = 24) -> int:
         """
@@ -198,7 +198,7 @@ class AtencionClientesBot:
         Returns:
             Número de usuarios eliminados
         """
-        usuarios_eliminados = self.gestor_estados.limpiar_estados_antiguos(horas)
+        usuarios_eliminados = self.agente.gestor_estados.limpiar_estados_antiguos(horas)
         print(f"Limpiados {usuarios_eliminados} usuarios inactivos por más de {horas} horas")
         return usuarios_eliminados
     
@@ -209,7 +209,7 @@ class AtencionClientesBot:
         Returns:
             Lista de números de teléfono activos
         """
-        return self.gestor_estados.obtener_usuarios_activos()
+        return self.agente.gestor_estados.obtener_usuarios_activos()
     
     def eliminar_usuario(self, telefono_usuario: str) -> bool:
         """
@@ -221,7 +221,7 @@ class AtencionClientesBot:
         Returns:
             True si se eliminó exitosamente
         """
-        return self.gestor_estados.eliminar_estado(telefono_usuario)            
+        return self.agente.gestor_estados.eliminar_estado(telefono_usuario)            
 
 
 # Inicializar aplicación Flask
