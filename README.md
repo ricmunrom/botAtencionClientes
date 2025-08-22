@@ -340,11 +340,11 @@ cp logs/bot.log logs/backup_$(date +%Y%m%d_%H%M%S).log
 ## 🚀 Próximas Mejoras
 
 - [ ] Integración con base de datos real
-- [ ] Sistema de notificaciones administrativas
 - [ ] Dashboard web para monitoreo
 - [ ] Soporte para imágenes de vehículos
 - [ ] Integración con CRM
-- [ ] Métricas y analytics avanzados
+- [ ] Concurrencia para múltiples usuarios
+- [ ] Soporte para múltiples idiomas
 
 ## 👨‍💻 Desarrollado por
 
