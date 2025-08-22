@@ -565,6 +565,15 @@ class AgentePrincipal:
             respuesta = self.agent_executor.invoke({
                 "input": mensaje
             })
+
+            # Garantizamos que la respuesta es de la última tool usada:
+            if respuesta.get('intermediate_steps'):
+                # Si usó tools, tomar la respuesta de la última tool
+                ultima_tool_respuesta = respuesta['intermediate_steps'][-1][1]
+                respuesta_final = ultima_tool_respuesta
+            else:
+                # Si no usó tools, usar respuesta normal
+                respuesta_final = respuesta.get('output', 'Lo siento, no pude procesar tu mensaje.')
             
             print(f"🔍 DEBUG: Respuesta completa del agente: {respuesta}")
             print(f"🔍 DEBUG: Pasos intermedios: {respuesta.get('intermediate_steps', [])}")
