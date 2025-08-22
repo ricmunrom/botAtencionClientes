@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from typing import Dict, Optional, Any, List
 from agent import AgentePrincipal
+import traceback
 
 # Cargar variables de entorno
 load_dotenv()
@@ -377,7 +378,6 @@ def test_agente():
         
     except Exception as e:
         print(f"❌ ERROR en test-agente: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 

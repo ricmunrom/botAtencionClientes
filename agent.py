@@ -10,6 +10,7 @@ from estado_global import EstadoGlobal, GestorEstados
 from conocimiento_kavak import buscar_informacion
 from catalogo_autos import CatalogoAutos, formatear_lista_autos
 import financiamiento
+import traceback
 
 
 class PropuestaValorTool(BaseTool):
@@ -124,7 +125,6 @@ class CatalogoTool(BaseTool):
                 
         except Exception as e:
             print(f"ERROR en CatalogoTool: {e}")
-            import traceback
             traceback.print_exc()
             return "Disculpa, ocurrió un error al buscar en el catálogo. ¿Podrías reformular tu búsqueda?"
 
@@ -234,7 +234,6 @@ class CatalogoTool(BaseTool):
                 print(f"DEBUG: Auto específico seleccionado - stock_id: {auto_especifico.get('stock_id')}")
         
         # Formatear respuesta
-        from catalogo_autos import formatear_lista_autos
         respuesta_formateada = formatear_lista_autos(autos_encontrados)
         
         estado.actualizar('ultima_respuesta_tipo', 'busqueda_catalogo')
@@ -447,7 +446,6 @@ class FinanzasTool(BaseTool):
             
         except Exception as e:
             print(f"ERROR en FinanzasTool: {e}")
-            import traceback
             traceback.print_exc()
             return "Disculpa, ocurrió un error al calcular el financiamiento. ¿Podrías proporcionar más detalles sobre el enganche que tienes disponible?"
 
@@ -568,7 +566,6 @@ class AgentePrincipal:
             
         except Exception as e:
             print(f"❌ ERROR procesando mensaje para {telefono_usuario}: {e}")
-            import traceback
             traceback.print_exc()
             return "Lo siento, ocurrió un error procesando tu consulta. ¿Podrías intentar de nuevo?"
                 
