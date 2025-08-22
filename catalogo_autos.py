@@ -74,26 +74,58 @@ class CatalogoAutos:
         filtros = {}
         texto_lower = preferencias.lower()
         
-        # Extraer presupuesto
-        patron_precio = r'(\d{1,3}(?:,?\d{3})*(?:\.\d{2})?)\s*(?:pesos|mx|mxn|mil|k)?'
-        precios = re.findall(patron_precio, texto_lower.replace(',', ''))
-        if precios:
-            try:
-                precio_max = float(precios[0].replace(',', ''))
-                # Si es menor a 1000, probablemente son miles
-                if precio_max < 1000:
-                    precio_max *= 1000
-                filtros['precio_max'] = precio_max
-            except:
-                pass
+        # PASO 1: Extraer año PRIMERO para evitar confusión con precios
+        años_encontrados = []
+        patron_año = r'(20\d{2}|19\d{2})'
+        años = re.findall(patron_año, texto_lower)
+        if años:
+            año = int(años[0])
+            filtros['año_min'] = año
+            años_encontrados.append(años[0])
+            print(f"DEBUG: Año detectado: {año}")
         
-        # Extraer marca y modelo específico (MEJORADO)
+        # Buscar palabras clave para año
+        if 'nuevo' in texto_lower or 'reciente' in texto_lower:
+            filtros['año_min'] = 2020
+            print(f"DEBUG: Palabra clave 'nuevo/reciente' - año mín: 2020")
+        elif 'viejo' in texto_lower or 'antiguo' in texto_lower:
+            filtros['año_max'] = 2015
+            print(f"DEBUG: Palabra clave 'viejo/antiguo' - año máx: 2015")
+        
+        # PASO 2: Extraer presupuesto SOLO con contexto específico
+        palabras_precio = ['pesos', 'mx', 'mxn', 'presupuesto', 'precio', 'hasta', 'máximo', 'mil', 'k']
+        
+        # Solo buscar precio si hay palabras contextuales
+        if any(palabra in texto_lower for palabra in palabras_precio):
+            # Patrón más específico que excluye años ya encontrados
+            patron_precio = r'(\d{1,3}(?:,?\d{3})*(?:\.\d{2})?)\s*(?:pesos|mx|mxn|mil|k|máximo|hasta)?'
+            precios = re.findall(patron_precio, texto_lower.replace(',', ''))
+            
+            for precio_str in precios:
+                # Saltar si es un año ya identificado
+                if precio_str in años_encontrados:
+                    continue
+                    
+                try:
+                    precio_max = float(precio_str.replace(',', ''))
+                    # Si es menor a 1000, probablemente son miles
+                    if precio_max < 1000:
+                        precio_max *= 1000
+                    # Validar que sea un precio razonable para autos
+                    if 50000 <= precio_max <= 2000000:
+                        filtros['precio_max'] = precio_max
+                        print(f"DEBUG: Precio máximo detectado: ${precio_max:,.0f}")
+                        break
+                except:
+                    continue
+        
+        # PASO 3: Extraer marca y modelo específico
         marcas_conocidas = self.df['make'].str.lower().unique() if not self.df.empty else []
         
         for marca in marcas_conocidas:
             if marca in texto_lower:
                 filtros['marca'] = marca.title()
-                print(f"🔍 DEBUG: Marca detectada: {marca}")
+                print(f"DEBUG: Marca detectada: {marca}")
                 
                 # Buscar modelo específico para esa marca
                 modelos_marca = self.df[self.df['make'].str.lower() == marca]['model'].str.lower().unique()
@@ -101,49 +133,34 @@ class CatalogoAutos:
                     # Buscar el modelo en el texto (considerando espacios y variaciones)
                     if modelo in texto_lower:
                         filtros['modelo'] = modelo.title()
-                        print(f"🔍 DEBUG: Modelo específico detectado: {modelo}")
+                        print(f"DEBUG: Modelo específico detectado: {modelo}")
                         break
                     # También buscar sin espacios por si escriben "ecosport" en lugar de "eco sport"
                     elif modelo.replace(' ', '') in texto_lower.replace(' ', ''):
                         filtros['modelo'] = modelo.title()
-                        print(f"🔍 DEBUG: Modelo específico detectado (sin espacios): {modelo}")
+                        print(f"DEBUG: Modelo específico detectado (sin espacios): {modelo}")
                         break
                 break
         
-        # Extraer año
-        patron_año = r'(20\d{2}|19\d{2})'
-        años = re.findall(patron_año, texto_lower)
-        if años:
-            filtros['año_min'] = int(años[0])
-            print(f"🔍 DEBUG: Año detectado: {años[0]}")
-        
-        # Buscar palabras clave para año
-        if 'nuevo' in texto_lower or 'reciente' in texto_lower:
-            filtros['año_min'] = 2020
-            print(f"🔍 DEBUG: Palabra clave 'nuevo/reciente' - año mín: 2020")
-        elif 'viejo' in texto_lower or 'antiguo' in texto_lower:
-            filtros['año_max'] = 2015
-            print(f"🔍 DEBUG: Palabra clave 'viejo/antiguo' - año máx: 2015")
-        
-        # Extraer kilometraje
+        # PASO 4: Extraer kilometraje
         if 'pocos kilómetros' in texto_lower or 'bajo kilometraje' in texto_lower:
             filtros['km_max'] = 50000
-            print(f"🔍 DEBUG: Bajo kilometraje - km máx: 50000")
+            print(f"DEBUG: Bajo kilometraje - km máx: 50000")
         elif 'muchos kilómetros' in texto_lower or 'alto kilometraje' in texto_lower:
             filtros['km_min'] = 100000
-            print(f"🔍 DEBUG: Alto kilometraje - km mín: 100000")
+            print(f"DEBUG: Alto kilometraje - km mín: 100000")
         
-        # Características específicas
+        # PASO 5: Características específicas
         if 'bluetooth' in texto_lower:
-            filtros['bluetooth'] = 'Sí'
-            print(f"🔍 DEBUG: Bluetooth requerido")
+            filtros['bluetooth'] = 'Yes'
+            print(f"DEBUG: Bluetooth requerido")
         if 'carplay' in texto_lower or 'car play' in texto_lower:
-            filtros['car_play'] = 'Sí'
-            print(f"🔍 DEBUG: CarPlay requerido")
+            filtros['car_play'] = 'Yes'
+            print(f"DEBUG: CarPlay requerido")
         
-        print(f"🔍 DEBUG: Filtros finales extraídos: {filtros}")
+        print(f"DEBUG: Filtros finales extraídos: {filtros}")
         return filtros
-
+        
     def _aplicar_filtros(self, filtros: Dict[str, Any]) -> pd.DataFrame:
         """
         Aplicar filtros al DataFrame
@@ -286,13 +303,13 @@ def formatear_auto_para_respuesta(auto: Dict[str, Any]) -> str:
     precio_formateado = f"${auto.get('price', 0):,.0f} MXN"
     km_formateado = f"{auto.get('km', 0):,} km"
     
-    info_auto = f"""🚗 **{auto.get('make', 'N/A')} {auto.get('model', 'N/A')} {auto.get('year', 'N/A')}**
-💰 Precio: {precio_formateado}
-📊 Kilometraje: {km_formateado}
-📱 Bluetooth: {'Sí' if auto.get('bluetooth') == 'Yes' else 'No'}
-📱 CarPlay: {'Sí' if auto.get('car_play') == 'Yes' else 'No'}
-🔧 Versión: {auto.get('version', 'N/A')}
-📋 ID: {auto.get('stock_id', 'N/A')}"""
+    info_auto = f"""**{auto.get('make', 'N/A')} {auto.get('model', 'N/A')} {auto.get('year', 'N/A')}**
+                Precio: {precio_formateado}
+                Kilometraje: {km_formateado}
+                Bluetooth: {'Sí' if auto.get('bluetooth') == 'Yes' else 'No'}
+                CarPlay: {'Sí' if auto.get('car_play') == 'Yes' else 'No'}
+                Versión: {auto.get('version', 'N/A')}
+                ID: {auto.get('stock_id', 'N/A')}"""
     
     return info_auto
 

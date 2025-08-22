@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from estado_global import EstadoGlobal, GestorEstados
 from conocimiento_kavak import buscar_informacion
 from catalogo_autos import CatalogoAutos, formatear_lista_autos
+import financiamiento
 
 
 class PropuestaValorTool(BaseTool):
@@ -79,10 +80,12 @@ class CatalogoTool(BaseTool):
     
     def _run(self, preferencias: str) -> str:
         """
-        Ejecutar búsqueda en catálogo
+        Ejecutar búsqueda en catálogo con lógica híbrida:
+        - Si hay stock_id: buscar por ID específico
+        - Si no hay stock_id: buscar por filtros
         
         Args:
-            preferencias: Preferencias del cliente (presupuesto, marca, modelo, etc.)
+            preferencias: Preferencias del cliente o consulta sobre auto actual
             
         Returns:
             Recomendaciones de autos del catálogo
@@ -91,69 +94,208 @@ class CatalogoTool(BaseTool):
             # Obtener el estado del usuario actual
             estado = self.gestor_estados.obtener_estado(self.telefono_actual)
             
-            # Registrar consulta y preferencias en estado global
+            # Registrar consulta en estado global
             estado.actualizar('ultima_consulta', f"catalogo: {preferencias}")
-            estado.actualizar('cliente_preferencias', preferencias)
             estado.actualizar('tipo_consulta', 'busqueda_catalogo')
             
-            print(f"🔍 DEBUG CatalogoTool: Buscando autos con preferencias: {preferencias}")
+            print(f"DEBUG CatalogoTool: Procesando: {preferencias}")
             
             # Inicializar catálogo
             catalogo = CatalogoAutos()
             
-            # Buscar autos según preferencias
-            autos_encontrados = catalogo.buscar_autos(preferencias)
+            # LÓGICA HÍBRIDA: Verificar si ya hay un auto seleccionado
+            stock_id_actual = estado.obtener('auto_stock_id')
             
-            print(f"🔍 DEBUG CatalogoTool: Encontrados {len(autos_encontrados)} autos")
+            if stock_id_actual and self._es_consulta_sobre_auto_actual(preferencias):
+                # CASO 1: Ya hay auto seleccionado y pregunta sobre él
+                print(f"DEBUG: Consultando auto actual con stock_id: {stock_id_actual}")
+                return self._procesar_consulta_auto_actual(catalogo, estado, preferencias)
             
-            # Guardar resultados en el estado
-            estado.actualizar_autos_recomendados(autos_encontrados)
+            elif self._es_nueva_busqueda(preferencias):
+                # CASO 2: Nueva búsqueda - limpiar auto anterior y buscar por filtros
+                print(f"DEBUG: Nueva búsqueda detectada, limpiando auto anterior")
+                estado.limpiar_auto_completo()
+                return self._procesar_nueva_busqueda(catalogo, estado, preferencias)
             
-            # Si se encontraron autos, guardar filtros aplicados
-            if autos_encontrados:
-                # Extraer filtros para guardar en estado
-                filtros_aplicados = catalogo._extraer_filtros(preferencias)
-                estado.actualizar_filtros_busqueda(filtros_aplicados)
-                
-                print(f"🔍 DEBUG CatalogoTool: Filtros aplicados: {filtros_aplicados}")
-            
-            # Detectar si el usuario muestra interés específico en un auto
-            if autos_encontrados:
-                auto_especifico = self._detectar_auto_especifico(preferencias, autos_encontrados)
-                
-                if auto_especifico:
-                    # Guardar el auto específico en el estado
-                    estado.actualizar_auto_seleccionado(auto_especifico)
-                    print(f"🔍 DEBUG CatalogoTool: Auto específico guardado: {auto_especifico.get('make')} {auto_especifico.get('model')} {auto_especifico.get('year')}")
-            
-            # Formatear respuesta
-            respuesta_formateada = formatear_lista_autos(autos_encontrados)
-            
-            # Registrar que se proporcionaron recomendaciones
-            estado.actualizar('ultima_respuesta_tipo', 'catalogo_autos')
-            
-            # Agregar contexto adicional
-            if autos_encontrados:
-                respuesta_final = f"{respuesta_formateada}\n\n💡 También puedo ayudarte con el financiamiento de cualquiera de estos autos si te interesa."
             else:
-                # Sugerir alternativas si no se encontraron autos
-                estadisticas = catalogo.obtener_estadisticas()
-                marcas_disponibles = estadisticas.get('marcas_disponibles', [])[:5]  # Top 5 marcas
+                # CASO 3: Búsqueda normal por filtros (primera vez o sin auto específico)
+                print(f"DEBUG: Búsqueda por filtros")
+                return self._procesar_nueva_busqueda(catalogo, estado, preferencias)
                 
-                respuesta_final = f"{respuesta_formateada}\n\n💡 Tenemos autos de estas marcas disponibles: {', '.join(marcas_disponibles)}\n\n¿Te gustaría ajustar tu búsqueda o ver opciones de alguna marca específica?"
-            
-            return respuesta_final
-            
-        except ImportError as e:
-            print(f"❌ ERROR ImportError en CatalogoTool: {e}")
-            return "Lo siento, hay un problema técnico con el catálogo. ¿Podrías intentar de nuevo en un momento?"
-        
         except Exception as e:
-            print(f"❌ ERROR en CatalogoTool: {e}")
+            print(f"ERROR en CatalogoTool: {e}")
             import traceback
             traceback.print_exc()
-            return "Disculpa, ocurrió un error al buscar en el catálogo. ¿Podrías reformular tu búsqueda o ser más específico sobre qué tipo de auto buscas?"
-    
+            return "Disculpa, ocurrió un error al buscar en el catálogo. ¿Podrías reformular tu búsqueda?"
+
+    def _es_consulta_sobre_auto_actual(self, preferencias: str) -> bool:
+        """
+        Detectar si la consulta es sobre el auto ya seleccionado
+        
+        Args:
+            preferencias: Texto del usuario
+            
+        Returns:
+            True si consulta sobre auto actual
+        """
+        preferencias_lower = preferencias.lower()
+        
+        # Palabras que indican consulta sobre auto actual
+        palabras_consulta_actual = [
+            'detalles', 'información', 'más info', 'dime más', 'cuéntame',
+            'tiene bluetooth', 'tiene carplay', 'dimensiones', 'características',
+            'este auto', 'ese auto', 'el auto', 'más sobre', 'especificaciones'
+        ]
+        
+        return any(palabra in preferencias_lower for palabra in palabras_consulta_actual)
+
+    def _es_nueva_busqueda(self, preferencias: str) -> bool:
+        """
+        Detectar si es una nueva búsqueda que requiere limpiar auto anterior
+        
+        Args:
+            preferencias: Texto del usuario
+            
+        Returns:
+            True si es nueva búsqueda
+        """
+        preferencias_lower = preferencias.lower()
+        
+        # Palabras que indican nueva búsqueda
+        palabras_nueva_busqueda = [
+            'quiero', 'busco', 'prefiero', 'mejor', 'otro', 'diferente',
+            'muéstrame', 'opciones', 'alternativa', 'cambiar'
+        ]
+        
+        return any(palabra in preferencias_lower for palabra in palabras_nueva_busqueda)
+
+    def _procesar_consulta_auto_actual(self, catalogo: CatalogoAutos, estado: EstadoGlobal, preferencias: str) -> str:
+        """
+        Procesar consulta sobre auto ya seleccionado
+        
+        Args:
+            catalogo: Instancia del catálogo
+            estado: Estado del usuario
+            preferencias: Consulta del usuario
+            
+        Returns:
+            Información detallada del auto seleccionado
+        """
+        stock_id = estado.obtener('auto_stock_id')
+        
+        # Obtener auto completo por stock_id
+        auto_completo = catalogo.obtener_auto_por_stock_id(stock_id)
+        
+        if not auto_completo:
+            estado.limpiar_auto_completo()
+            return "Lo siento, el auto que tenías seleccionado ya no está disponible. ¿Te gustaría buscar otro?"
+        
+        # Actualizar estado con datos más recientes
+        estado.actualizar_auto_seleccionado(auto_completo)
+        
+        # Generar respuesta detallada
+        respuesta = self._generar_respuesta_detallada(auto_completo, preferencias)
+        
+        estado.actualizar('ultima_respuesta_tipo', 'detalles_auto_actual')
+        
+        return respuesta
+
+    def _procesar_nueva_busqueda(self, catalogo: CatalogoAutos, estado: EstadoGlobal, preferencias: str) -> str:
+        """
+        Procesar nueva búsqueda por filtros
+        
+        Args:
+            catalogo: Instancia del catálogo
+            estado: Estado del usuario
+            preferencias: Preferencias de búsqueda
+            
+        Returns:
+            Lista de autos encontrados
+        """
+        # Buscar autos según preferencias
+        autos_encontrados = catalogo.buscar_autos(preferencias)
+        
+        print(f"DEBUG: Encontrados {len(autos_encontrados)} autos")
+        
+        # Guardar resultados en el estado
+        estado.actualizar_autos_recomendados(autos_encontrados)
+        
+        # Si se encontraron autos, guardar filtros aplicados
+        if autos_encontrados:
+            filtros_aplicados = catalogo._extraer_filtros(preferencias)
+            estado.actualizar_filtros_busqueda(filtros_aplicados)
+            
+            # Detectar si el usuario muestra interés específico en un auto
+            auto_especifico = self._detectar_auto_especifico(preferencias, autos_encontrados)
+            
+            if auto_especifico:
+                # Guardar el auto específico Y su stock_id
+                estado.actualizar_auto_seleccionado(auto_especifico)
+                print(f"DEBUG: Auto específico seleccionado - stock_id: {auto_especifico.get('stock_id')}")
+        
+        # Formatear respuesta
+        from catalogo_autos import formatear_lista_autos
+        respuesta_formateada = formatear_lista_autos(autos_encontrados)
+        
+        estado.actualizar('ultima_respuesta_tipo', 'busqueda_catalogo')
+        
+        # Agregar contexto adicional
+        if autos_encontrados:
+            respuesta_final = f"{respuesta_formateada}\n\nTambién puedo ayudarte con el financiamiento de cualquiera de estos autos si te interesa."
+        else:
+            # Sugerir alternativas si no se encontraron autos
+            estadisticas = catalogo.obtener_estadisticas()
+            marcas_disponibles = estadisticas.get('marcas_disponibles', [])[:5]
+            
+            respuesta_final = f"{respuesta_formateada}\n\nTenemos autos de estas marcas disponibles: {', '.join(marcas_disponibles)}\n\n¿Te gustaría ajustar tu búsqueda o ver opciones de alguna marca específica?"
+        
+        return respuesta_final
+
+    def _generar_respuesta_detallada(self, auto: Dict[str, Any], consulta: str) -> str:
+        """
+        Generar respuesta detallada sobre auto específico
+        
+        Args:
+            auto: Datos completos del auto
+            consulta: Consulta específica del usuario
+            
+        Returns:
+            Respuesta detallada
+        """
+        consulta_lower = consulta.lower()
+        
+        # Información básica siempre incluida
+        precio_formateado = f"${auto.get('price', 0):,.0f} MXN"
+        km_formateado = f"{auto.get('km', 0):,} km"
+        
+        respuesta = f"""Aquí tienes los detalles de tu {auto.get('make', 'N/A')} {auto.get('model', 'N/A')} {auto.get('year', 'N/A')}:
+
+    Precio: {precio_formateado}
+    Kilometraje: {km_formateado}
+    Versión: {auto.get('version', 'N/A')}
+    Bluetooth: {'Sí' if auto.get('bluetooth') == 'Yes' else 'No'}
+    CarPlay: {'Sí' if auto.get('car_play') == 'Yes' else 'No'}"""
+        
+        # Agregar información específica según la consulta
+        if 'bluetooth' in consulta_lower:
+            bluetooth_status = 'Sí' if auto.get('bluetooth') == 'Yes' else 'No'
+            respuesta += f"\n\nBluetooth: {bluetooth_status}"
+        
+        if 'carplay' in consulta_lower or 'car play' in consulta_lower:
+            carplay_status = 'Sí' if auto.get('car_play') == 'Yes' else 'No'
+            respuesta += f"\n\nCarPlay: {carplay_status}"
+        
+        if 'dimensiones' in consulta_lower:
+            respuesta += f"\n\nDimensiones:"
+            respuesta += f"\nLargo: {auto.get('largo', 'N/A')} mm"
+            respuesta += f"\nAncho: {auto.get('ancho', 'N/A')} mm"
+            respuesta += f"\nAltura: {auto.get('altura', 'N/A')} mm"
+        
+        respuesta += f"\n\nID del vehículo: {auto.get('stock_id', 'N/A')}"
+        respuesta += "\n\n¿Te gustaría conocer las opciones de financiamiento para este auto?"
+        
+        return respuesta
+
     def _detectar_auto_especifico(self, preferencias: str, autos_encontrados: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """
         Detectar si el usuario está preguntando por un auto específico
@@ -259,28 +401,44 @@ class FinanzasTool(BaseTool):
             estado.actualizar('ultima_consulta', f"financiamiento: {parametros_financiamiento}")
             estado.actualizar('tipo_consulta', 'calculo_financiamiento')
             
-            print(f"🔍 DEBUG FinanzasTool: Calculando financiamiento con: {parametros_financiamiento}")
+            print(f"DEBUG FinanzasTool: Calculando financiamiento con: {parametros_financiamiento}")
             
-            # Obtener precio del auto seleccionado
+            # Obtener información del auto seleccionado
             auto_precio = estado.obtener('auto_precio')
             auto_info = estado.obtener_info_auto_completa()
             
-            if not auto_precio:
-                return self._respuesta_sin_auto_seleccionado()
+            # Validar que hay auto seleccionado
+            if not financiamiento.validar_auto_seleccionado(auto_precio):
+                return financiamiento.generar_mensaje_sin_auto()
             
-            # Extraer enganche del texto
-            enganche_especificado = self._extraer_enganche(parametros_financiamiento, auto_precio)
+            # Extraer parámetros del texto del usuario
+            enganche_especificado = financiamiento.extraer_enganche(parametros_financiamiento, auto_precio)
+            plazo_especifico = financiamiento.extraer_plazo(parametros_financiamiento)
             
-            print(f"🔍 DEBUG FinanzasTool: Precio auto: ${auto_precio:,.0f}, Enganche: {enganche_especificado}")
+            print(f"DEBUG FinanzasTool: Precio auto: ${auto_precio:,.0f}, Enganche: {enganche_especificado}, Plazo: {plazo_especifico}")
             
-            # Generar planes de financiamiento
+            # Generar respuesta según parámetros especificados
             if enganche_especificado:
-                # Si especificó enganche, calcular para ese enganche específico
-                respuesta = self._generar_plan_especifico(auto_info, auto_precio, enganche_especificado, parametros_financiamiento)
+                # Enganche específico proporcionado
+                respuesta = financiamiento.generar_plan_especifico(auto_info, auto_precio, enganche_especificado, plazo_especifico)
+                
+                # Guardar parámetros en el estado
+                estado.actualizar('enganche', enganche_especificado)
+                estado.actualizar('monto_financiar', auto_precio - enganche_especificado)
+                
+                if plazo_especifico:
+                    # Calcular y guardar pago mensual para plazo específico
+                    pago_mensual = financiamiento.CalculadoraFinanciamiento.calcular_pago_mensual(
+                        auto_precio - enganche_especificado, plazo_especifico
+                    )
+                    estado.actualizar('plazo_años', plazo_especifico)
+                    estado.actualizar('pago_mensual', pago_mensual)
+                    
+                    print(f"DEBUG: Guardado en estado - Enganche: ${enganche_especificado:,.0f}, Plazo: {plazo_especifico} años, Pago mensual: ${pago_mensual:,.0f}")
                 
             else:
-                # Si no especificó enganche, mostrar múltiples opciones
-                respuesta = self._generar_opciones_multiples(auto_info, auto_precio)
+                # Sin enganche específico, mostrar múltiples opciones
+                respuesta = financiamiento.generar_opciones_multiples(auto_info, auto_precio)
             
             # Registrar que se proporcionó financiamiento
             estado.actualizar('ultima_respuesta_tipo', 'planes_financiamiento')
@@ -288,227 +446,10 @@ class FinanzasTool(BaseTool):
             return respuesta
             
         except Exception as e:
-            print(f"❌ ERROR en FinanzasTool: {e}")
+            print(f"ERROR en FinanzasTool: {e}")
             import traceback
             traceback.print_exc()
             return "Disculpa, ocurrió un error al calcular el financiamiento. ¿Podrías proporcionar más detalles sobre el enganche que tienes disponible?"
-    
-    def _respuesta_sin_auto_seleccionado(self) -> str:
-        """Respuesta cuando no hay auto seleccionado"""
-        return """Para calcular tu financiamiento necesito que primero selecciones un auto.
-        
-🔍 Puedes buscar autos diciendo algo como:
-• "Quiero un Toyota con presupuesto de 300000"
-• "Muéstrame autos del 2020"
-• "Busco un auto con bluetooth"
-
-Una vez que selecciones un auto, podremos calcular las opciones de financiamiento perfectas para ti."""
-    
-    def _extraer_enganche(self, texto: str, precio_auto: float) -> Optional[float]:
-        """
-        Extraer enganche del texto del usuario
-        
-        Args:
-            texto: Texto con parámetros de financiamiento
-            precio_auto: Precio del auto para calcular porcentajes
-            
-        Returns:
-            Monto del enganche o None si no se especifica
-        """
-        texto_lower = texto.lower()
-        
-        # Buscar monto específico
-        import re
-        patron_monto = r'(\d{1,3}(?:,?\d{3})*(?:\.\d{2})?)\s*(?:pesos|mx|mxn|de enganche|enganche)?'
-        montos = re.findall(patron_monto, texto_lower.replace(',', ''))
-        
-        if montos:
-            try:
-                monto = float(montos[0].replace(',', ''))
-                # Si es menor a 1000, probablemente son miles
-                if monto < 1000:
-                    monto *= 1000
-                
-                # Validar que el enganche no sea mayor al precio del auto
-                if monto <= precio_auto:
-                    return monto
-            except:
-                pass
-        
-        # Buscar porcentaje
-        patron_porcentaje = r'(\d{1,2})\s*%'
-        porcentajes = re.findall(patron_porcentaje, texto_lower)
-        
-        if porcentajes:
-            try:
-                porcentaje = float(porcentajes[0]) / 100
-                if 0.05 <= porcentaje <= 0.80:  # Entre 5% y 80%
-                    return precio_auto * porcentaje
-            except:
-                pass
-        
-        return None
-    
-    def _extraer_plazo(self, texto: str) -> Optional[int]:
-        """
-        Extraer plazo específico del texto
-        
-        Args:
-            texto: Texto con parámetros de financiamiento
-            
-        Returns:
-            Plazo en años o None
-        """
-        import re
-        texto_lower = texto.lower()
-        
-        # Buscar patrones como "3 años", "a 4 años", "financiar a 5 años"
-        patrones_plazo = [
-            r'(\d)\s*años?',
-            r'a\s*(\d)\s*años?',
-            r'financiar\s*a\s*(\d)\s*años?',
-            r'plazo\s*de\s*(\d)\s*años?'
-        ]
-        
-        for patron in patrones_plazo:
-            matches = re.findall(patron, texto_lower)
-            if matches:
-                try:
-                    plazo = int(matches[0])
-                    # Validar que esté en el rango permitido (3-6 años)
-                    if 3 <= plazo <= 6:
-                        print(f"🔍 DEBUG: Plazo específico detectado: {plazo} años")
-                        return plazo
-                except:
-                    pass
-        
-        return None
-    
-    def _calcular_pago_mensual(self, monto_financiar: float, años: int) -> float:
-        """
-        Calcular pago mensual con fórmula de financiamiento
-        
-        Args:
-            monto_financiar: Monto a financiar
-            años: Años del plazo
-            
-        Returns:
-            Pago mensual
-        """
-        if monto_financiar <= 0:
-            return 0
-        
-        tasa_anual = 0.10  # 10% fijo
-        tasa_mensual = tasa_anual / 12
-        num_pagos = años * 12
-        
-        # Fórmula de financiamiento: PMT = [P × r × (1 + r)^n] / [(1 + r)^n - 1]
-        if tasa_mensual == 0:
-            return monto_financiar / num_pagos
-        
-        factor = (1 + tasa_mensual) ** num_pagos
-        pago_mensual = (monto_financiar * tasa_mensual * factor) / (factor - 1)
-        
-        return pago_mensual
-    
-    def _generar_plan_especifico(self, auto_info: Dict, precio_auto: float, enganche: float, parametros_financiamiento: str) -> str:
-        """Generar plan para enganche específico"""
-        monto_financiar = precio_auto - enganche
-        auto_descripcion = f"{auto_info.get('marca', 'N/A')} {auto_info.get('modelo', 'N/A')} {auto_info.get('año', 'N/A')}"
-        
-        # Verificar si se especificó un plazo específico
-        plazo_especifico = self._extraer_plazo(parametros_financiamiento)
-        
-        if plazo_especifico:
-            # Plan específico para un plazo
-            pago_mensual = self._calcular_pago_mensual(monto_financiar, plazo_especifico)
-            total_pagos = pago_mensual * plazo_especifico * 12
-            total_intereses = total_pagos - monto_financiar
-            
-            respuesta = f"""💰 **Plan de financiamiento para {auto_descripcion}**
-
-🚗 Precio del auto: ${precio_auto:,.0f} MXN
-💵 Enganche: ${enganche:,.0f} MXN ({enganche/precio_auto*100:.1f}%)
-🏦 Monto a financiar: ${monto_financiar:,.0f} MXN
-📊 Tasa de interés: 10% anual
-
-⏱️ **Financiamiento a {plazo_especifico} años ({plazo_especifico * 12} mensualidades)**
-💳 Pago mensual: ${pago_mensual:,.0f} MXN
-💰 Total a pagar: ${total_pagos:,.0f} MXN
-📈 Total intereses: ${total_intereses:,.0f} MXN
-
-¿Te interesa esta opción? ¡Puedo ayudarte con los siguientes pasos!"""
-            
-            # Guardar todos los valores en el estado
-            estado = self.gestor_estados.obtener_estado(self.telefono_actual)
-            estado.actualizar('enganche', enganche)
-            estado.actualizar('monto_financiar', monto_financiar)
-            estado.actualizar('plazo_años', plazo_especifico)
-            estado.actualizar('pago_mensual', pago_mensual)
-            
-            print(f"🔍 DEBUG: Guardado en estado - Enganche: ${enganche:,.0f}, Plazo: {plazo_especifico} años, Pago mensual: ${pago_mensual:,.0f}")
-            
-        else:
-            # Plan con múltiples opciones de plazo
-            respuesta = f"""💰 **Plan de financiamiento para {auto_descripcion}**
-
-🚗 Precio del auto: ${precio_auto:,.0f} MXN
-💵 Enganche: ${enganche:,.0f} MXN ({enganche/precio_auto*100:.1f}%)
-🏦 Monto a financiar: ${monto_financiar:,.0f} MXN
-📊 Tasa de interés: 10% anual
-
-**Opciones de pago mensual:**
-"""
-            
-            for años in [3, 4, 5, 6]:
-                pago_mensual = self._calcular_pago_mensual(monto_financiar, años)
-                total_pagos = pago_mensual * años * 12
-                total_intereses = total_pagos - monto_financiar
-                
-                respuesta += f"""
-⏱️ **{años} años ({años * 12} mensualidades)**
-   💳 Pago mensual: ${pago_mensual:,.0f} MXN
-   💰 Total a pagar: ${total_pagos:,.0f} MXN
-   📈 Total intereses: ${total_intereses:,.0f} MXN
-"""
-            
-            respuesta += "\n¿Te interesa alguna de estas opciones? ¡Puedo ayudarte con los siguientes pasos!"
-            
-            # Solo guardar enganche cuando no hay plazo específico
-            estado = self.gestor_estados.obtener_estado(self.telefono_actual)
-            estado.actualizar('enganche', enganche)
-            estado.actualizar('monto_financiar', monto_financiar)
-        
-        return respuesta
-    
-    def _generar_opciones_multiples(self, auto_info: Dict, precio_auto: float) -> str:
-        """Generar múltiples opciones de enganche"""
-        auto_descripcion = f"{auto_info.get('marca', 'N/A')} {auto_info.get('modelo', 'N/A')} {auto_info.get('año', 'N/A')}"
-        
-        respuesta = f"""💰 **Opciones de financiamiento para {auto_descripcion}**
-🚗 Precio: ${precio_auto:,.0f} MXN | 📊 Tasa: 10% anual
-
-"""
-        
-        # Opciones de enganche: 10%, 20%, 30%
-        enganches = [0.10, 0.20, 0.30]
-        
-        for porcentaje_enganche in enganches:
-            enganche = precio_auto * porcentaje_enganche
-            monto_financiar = precio_auto - enganche
-            
-            respuesta += f"""**💵 Con {porcentaje_enganche*100:.0f}% de enganche (${enganche:,.0f} MXN):**
-"""
-            
-            for años in [3, 4, 5, 6]:
-                pago_mensual = self._calcular_pago_mensual(monto_financiar, años)
-                respuesta += f"   • {años} años: ${pago_mensual:,.0f}/mes\n"
-            
-            respuesta += "\n"
-        
-        respuesta += "💡 ¿Qué enganche y plazo te conviene más? Puedo darte más detalles de cualquier opción."
-        
-        return respuesta
 
 class AgentePrincipal:
     """
