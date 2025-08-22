@@ -74,10 +74,10 @@ def extraer_enganche(texto: str, precio_auto: float) -> Optional[float]:
     
     # PRIMERO: Buscar patrones específicos de enganche
     patrones_enganche = [
-        r'enganche\s*de\s*(\d{1,3}(?:,?\d{3})*)',
-        r'dando\s*un\s*enganche\s*de\s*(\d{1,3}(?:,?\d{3})*)',
-        r'con\s*(\d{1,3}(?:,?\d{3})*)\s*de\s*enganche',
-        r'(\d{1,3}(?:,?\d{3})*)\s*pesos.*enganche'
+        r'enganche\s*de\s*(\d{1,6})',
+        r'dando\s*un\s*enganche\s*de\s*(\d{1,6})',
+        r'con\s*(\d{1,6})\s*de\s*enganche',
+        r'(\d{1,6})\s*pesos.*enganche'
     ]
     
     for patron in patrones_enganche:
@@ -108,7 +108,7 @@ def extraer_enganche(texto: str, precio_auto: float) -> Optional[float]:
     
     print("DEBUG: No se encontró enganche válido")
     return None
-    
+
 def extraer_plazo(texto: str) -> Optional[int]:
     """
     Extraer plazo específico del texto
