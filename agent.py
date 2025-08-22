@@ -501,37 +501,26 @@ class AgentePrincipal:
             ("system", """
             Eres un asistente de atención al cliente para Kavak México.
 
-            REGLAS CRÍTICAS:
-            1. Usa SOLO las herramientas para responder, nunca inventes información
-            2. La respuesta de la ÚLTIMA herramienta usada ES tu respuesta final
-            3. NUNCA agregues texto propio después de obtener respuesta de herramienta
-            4. Puedes usar múltiples herramientas en secuencia si es necesario
+            REGLAS IMPORTANTES:
+            1. SIEMPRE usa las herramientas para responder preguntas específicas
+            2. Incluye TODA la información que devuelve la herramienta en tu respuesta
+            3. Puedes agregar contexto útil adicional después de la información de la herramienta
 
             HERRAMIENTAS DISPONIBLES:
-            - propuesta_valor: Información sobre Kavak (sedes, beneficios, procesos)
-            - catalogo_autos: Búsqueda de vehículos disponibles
-            - planes_financiamiento: Cálculos de financiamiento
+            - propuesta_valor: Para información sobre Kavak (sedes, beneficios, procesos)
+            - catalogo_autos: Para buscar vehículos disponibles
+            - planes_financiamiento: Para calcular financiamiento
 
-            FLUJOS COMUNES:
-            - "Quiero un auto Toyota" → usa catalogo_autos
-            - "¿Qué es Kavak?" → usa propuesta_valor
-            - "Financiamiento para Toyota 2020" → usa catalogo_autos PRIMERO, luego planes_financiamiento
-            - "Cuánto pagaría por este auto" → usa planes_financiamiento (si ya hay auto seleccionado)
+            EJEMPLOS DE USO:
+            - "Quiero un auto Toyota" → usa catalogo_autos y muestra TODA la lista detallada
+            - "¿Qué es Kavak?" → usa propuesta_valor y proporciona la información completa
+            - "Financiamiento para Toyota 2020" → usa catalogo_autos primero, luego planes_financiamiento
 
-            COMPORTAMIENTO:
-            - Si necesitas info de auto para financiamiento, búscalo primero con catalogo_autos
-            - Siempre termina con la respuesta de la última herramienta usada
-            - No agregues comentarios adicionales después de usar herramientas
-
-            PROHIBIDO:
-            - Inventar información sobre autos, precios o financiamiento
-            - Agregar frases como "¿Te gustaría más información?" después de usar herramientas
-            - Reescribir o resumir las respuestas de las herramientas
+            IMPORTANTE: Cuando uses una herramienta, incluye TODA su respuesta en tu mensaje final.
             """),
             ("user", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
-
         return prompt
             
     def _configurar_tools_para_usuario(self, telefono_usuario: str) -> None:
@@ -566,19 +555,10 @@ class AgentePrincipal:
                 "input": mensaje
             })
 
-            # Garantizamos que la respuesta es de la última tool usada:
-            if respuesta.get('intermediate_steps'):
-                # Si usó tools, tomar la respuesta de la última tool
-                ultima_tool_respuesta = respuesta['intermediate_steps'][-1][1]
-                respuesta_final = ultima_tool_respuesta
-            else:
-                # Si no usó tools, usar respuesta normal
-                respuesta_final = respuesta.get('output', 'Lo siento, no pude procesar tu mensaje.')
-            
             print(f"🔍 DEBUG: Respuesta completa del agente: {respuesta}")
             print(f"🔍 DEBUG: Pasos intermedios: {respuesta.get('intermediate_steps', [])}")
             
-            # Extraer respuesta final
+            # CORRECCIÓN: Usar la respuesta del agente que YA incluye la info de las tools
             respuesta_final = respuesta.get('output', 'Lo siento, no pude procesar tu mensaje.')
             
             # Registrar la respuesta en el estado del usuario
@@ -591,7 +571,7 @@ class AgentePrincipal:
             import traceback
             traceback.print_exc()
             return "Lo siento, ocurrió un error procesando tu consulta. ¿Podrías intentar de nuevo?"
-    
+                
     def obtener_estado_actual(self, telefono_usuario: str) -> Dict[str, Any]:
         """
         Obtener el estado actual del agente para un usuario específico
