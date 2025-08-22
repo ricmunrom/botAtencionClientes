@@ -100,22 +100,7 @@ class EstadoGlobal:
             'claves': list(datos.keys())
         }
         self._estado['historial_acciones'].append(accion)
-    
-    def obtener_info_auto(self) -> Dict[str, Any]:
-        """
-        Obtener toda la información del auto seleccionado
         
-        Returns:
-            Diccionario con información del auto o diccionario vacío
-        """
-        return {
-            'auto_seleccionado': self._estado.get('auto_seleccionado'),
-            'auto_precio': self._estado.get('auto_precio'),
-            'auto_marca': self._estado.get('auto_marca'),
-            'auto_modelo': self._estado.get('auto_modelo'),
-            'auto_año': self._estado.get('auto_año')
-        }
-    
     def obtener_info_financiamiento(self) -> Dict[str, Any]:
         """
         Obtener toda la información de financiamiento
@@ -131,13 +116,6 @@ class EstadoGlobal:
             'monto_financiar': self._estado.get('monto_financiar'),
             'auto_precio': self._estado.get('auto_precio')
         }
-    
-    def limpiar_auto(self) -> None:
-        """Limpiar información del auto seleccionado"""
-        claves_auto = ['auto_seleccionado', 'auto_precio', 'auto_marca', 'auto_modelo', 'auto_año']
-        for clave in claves_auto:
-            self._estado[clave] = None
-        self._estado['timestamp'] = datetime.now()
     
     def limpiar_financiamiento(self) -> None:
         """Limpiar información de financiamiento manteniendo tasa fija"""
@@ -170,7 +148,7 @@ class EstadoGlobal:
         return {
             'cliente': self._estado.get('cliente_nombre'),
             'telefono': self._estado.get('cliente_telefono'),
-            'auto_info': self.obtener_info_auto(),
+            'auto_info': self.obtener_info_auto_completa(),
             'financiamiento_info': self.obtener_info_financiamiento(),
             'ultima_consulta': self._estado.get('ultima_consulta'),
             'ultimo_mensaje': self._estado.get('ultimo_mensaje'),

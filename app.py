@@ -179,6 +179,50 @@ class AtencionClientesBot:
             print(f"Error reiniciando conversación: {e}")
             return False
 
+    def obtener_resumen_general(self) -> Dict[str, Any]:
+        """
+        Obtener resumen de todos los usuarios activos
+        
+        Returns:
+            Diccionario con información de todos los usuarios
+        """
+        return self.gestor_estados.obtener_resumen_general()
+    
+    def limpiar_usuarios_inactivos(self, horas: int = 24) -> int:
+        """
+        Limpiar usuarios inactivos por más de X horas
+        
+        Args:
+            horas: Horas de inactividad para limpiar
+            
+        Returns:
+            Número de usuarios eliminados
+        """
+        usuarios_eliminados = self.gestor_estados.limpiar_estados_antiguos(horas)
+        print(f"Limpiados {usuarios_eliminados} usuarios inactivos por más de {horas} horas")
+        return usuarios_eliminados
+    
+    def obtener_usuarios_activos(self) -> List[str]:
+        """
+        Obtener lista de usuarios con conversaciones activas
+        
+        Returns:
+            Lista de números de teléfono activos
+        """
+        return self.gestor_estados.obtener_usuarios_activos()
+    
+    def eliminar_usuario(self, telefono_usuario: str) -> bool:
+        """
+        Eliminar un usuario específico del sistema
+        
+        Args:
+            telefono_usuario: Número de teléfono del usuario
+            
+        Returns:
+            True si se eliminó exitosamente
+        """
+        return self.gestor_estados.eliminar_estado(telefono_usuario)            
+
 
 # Inicializar aplicación Flask
 app = Flask(__name__)
@@ -253,7 +297,7 @@ def resumen_general():
     Endpoint para monitoreo del sistema
     """
     try:
-        resumen = bot_atencion.agente.obtener_resumen_general()
+        resumen = bot_atencion.obtener_resumen_general()
         return jsonify(resumen), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -266,7 +310,7 @@ def limpiar_usuarios_inactivos():
     """
     try:
         horas = request.json.get('horas', 24) if request.is_json else 24
-        usuarios_limpiados = bot_atencion.agente.limpiar_usuarios_inactivos(horas)
+        usuarios_limpiados = bot_atencion.limpiar_usuarios_inactivos(horas)
         return jsonify({
             "mensaje": f"Limpieza completada",
             "usuarios_eliminados": usuarios_limpiados,
@@ -282,7 +326,7 @@ def obtener_usuarios_activos():
     Endpoint para monitoreo del sistema
     """
     try:
-        usuarios = bot_atencion.agente.obtener_usuarios_activos()
+        usuarios = bot_atencion.obtener_usuarios_activos()
         return jsonify({
             "total_usuarios": len(usuarios),
             "usuarios_activos": usuarios
@@ -297,7 +341,7 @@ def eliminar_usuario(telefono: str):
     Endpoint para administración del sistema
     """
     try:
-        eliminado = bot_atencion.agente.eliminar_usuario(telefono)
+        eliminado = bot_atencion.eliminar_usuario(telefono)
         if eliminado:
             return jsonify({"mensaje": f"Usuario {telefono} eliminado exitosamente"}), 200
         else:
