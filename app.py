@@ -357,6 +357,21 @@ def eliminar_usuario(telefono: str):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/historial/<telefono>')
+def obtener_historial_usuario(telefono: str):
+    """Ver historial completo de acciones"""
+    try:
+        estado_usuario = bot_atencion.agente.gestor_estados.obtener_estado(telefono)
+        historial = estado_usuario.obtener('historial_acciones') or []
+        
+        return jsonify({
+            "usuario": telefono,
+            "total_acciones": len(historial),
+            "historial_completo": historial
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/test-agente', methods=['POST'])
 def test_agente():
     """Endpoint para probar el agente directamente"""

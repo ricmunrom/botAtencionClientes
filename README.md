@@ -162,6 +162,7 @@ PHONE_NUMBER_ID=tu_phone_number_id
 | `/usuarios-activos` | GET | Lista de usuarios con conversaciones activas |
 | `/eliminar-usuario/<telefono>` | DELETE | Eliminar usuario del sistema |
 | `/limpiar-inactivos` | POST | Limpiar usuarios inactivos |
+| `/historial/<telefono>` | GET | Historial completo de acciones de un usuario |
 | `/test-agente` | POST | Endpoint de prueba del agente |
 
 ### Ejemplos de Uso
@@ -174,6 +175,11 @@ curl http://localhost:5000/health
 **Estado de Usuario:**
 ```bash
 curl http://localhost:5000/estado/5215519118275
+```
+
+**Historial de Usuario:**
+```bash
+curl http://localhost:5000/historial/5215519118275
 ```
 
 **Prueba del Agente:**
@@ -345,13 +351,6 @@ cp logs/bot.log logs/backup_$(date +%Y%m%d_%H%M%S).log
 ## 👨‍💻 Desarrollado por
 
 **Ricardo Muñoz Romero**  
-Ingeniero de Software especializado en IA y Chatbots
-
----
-
-## 📄 Licencia
-
-Este proyecto está bajo licencia privada. Todos los derechos reservados.
 
 ---
 
