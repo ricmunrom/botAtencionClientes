@@ -21,7 +21,7 @@ class AtencionClientesBot:
         self.page_access_token = os.getenv('PAGE_ACCESS_TOKEN')
         self.phone_number_id = os.getenv('PHONE_NUMBER_ID')
         
-        # Inicializar agente principal (ahora con soporte multiusuario)
+        # Inicializar agente principal
         self.agente = AgentePrincipal()
         
         # Validar configuración
@@ -99,7 +99,7 @@ class AtencionClientesBot:
                 if message_text and sender_phone:
                     print(f"Mensaje de {sender_phone}: {message_text}")
                     
-                    # Procesar mensaje con el agente (ahora maneja automáticamente el estado por usuario)
+                    # Procesar mensaje con el agente 
                     respuesta = self.agente.procesar_mensaje(message_text, sender_phone)
                     
                     # Enviar respuesta

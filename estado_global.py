@@ -16,7 +16,7 @@ class EstadoGlobal:
             'cliente_telefono': None,
             'cliente_preferencias': {},
             
-            # Auto seleccionado/recomendado - EXPANDIDO PARA CSV
+            # Auto seleccionado/recomendado 
             'auto_seleccionado': None,
             'auto_stock_id': None,        # ID del auto en el CSV
             'auto_precio': None,

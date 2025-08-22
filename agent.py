@@ -8,6 +8,7 @@ from langchain.schema import BaseMessage
 from pydantic import BaseModel, Field
 from estado_global import EstadoGlobal, GestorEstados
 from conocimiento_kavak import buscar_informacion
+from catalogo_autos import CatalogoAutos, formatear_lista_autos
 
 
 class PropuestaValorTool(BaseTool):
@@ -86,10 +87,7 @@ class CatalogoTool(BaseTool):
         Returns:
             Recomendaciones de autos del catálogo
         """
-        try:
-            # Importar módulos necesarios
-            from catalogo_autos import CatalogoAutos, formatear_lista_autos
-            
+        try:    
             # Obtener el estado del usuario actual
             estado = self.gestor_estados.obtener_estado(self.telefono_actual)
             
