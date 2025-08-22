@@ -6,6 +6,9 @@ Leer CSV, filtrar y recomendar autos según preferencias del usuario
 import pandas as pd
 import re
 from typing import List, Dict, Any, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CatalogoAutos:
     """
@@ -27,9 +30,9 @@ class CatalogoAutos:
         """Cargar el catálogo desde CSV"""
         try:
             self.df = pd.read_csv(self.archivo_csv)
-            print(f"Catálogo cargado: {len(self.df)} autos disponibles")
+            logger.info(f"Catálogo cargado: {len(self.df)} autos disponibles")
         except Exception as e:
-            print(f"Error cargando catálogo: {e}")
+            logger.error(f"Error cargando catálogo: {e}")
             # Crear DataFrame vacío como fallback
             self.df = pd.DataFrame()
     
@@ -82,15 +85,12 @@ class CatalogoAutos:
             año = int(años[0])
             filtros['año_min'] = año
             años_encontrados.append(años[0])
-            print(f"DEBUG: Año detectado: {año}")
         
         # Buscar palabras clave para año
         if 'nuevo' in texto_lower or 'reciente' in texto_lower:
             filtros['año_min'] = 2020
-            print(f"DEBUG: Palabra clave 'nuevo/reciente' - año mín: 2020")
         elif 'viejo' in texto_lower or 'antiguo' in texto_lower:
             filtros['año_max'] = 2015
-            print(f"DEBUG: Palabra clave 'viejo/antiguo' - año máx: 2015")
         
         # PASO 2: Extraer presupuesto SOLO con contexto específico
         palabras_precio = ['pesos', 'mx', 'mxn', 'presupuesto', 'precio', 'hasta', 'máximo', 'mil', 'k']
@@ -114,7 +114,6 @@ class CatalogoAutos:
                     # Validar que sea un precio razonable para autos
                     if 50000 <= precio_max <= 2000000:
                         filtros['precio_max'] = precio_max
-                        print(f"DEBUG: Precio máximo detectado: ${precio_max:,.0f}")
                         break
                 except:
                     continue
@@ -128,7 +127,6 @@ class CatalogoAutos:
             if marca in texto_lower:
                 filtros['marca'] = marca.title()
                 marca_encontrada = marca
-                print(f"DEBUG: Marca detectada: {marca}")
                 break
         
         # Buscar modelo específico
@@ -138,11 +136,9 @@ class CatalogoAutos:
             for modelo in modelos_marca:
                 if modelo in texto_lower:
                     filtros['modelo'] = modelo.title()
-                    print(f"DEBUG: Modelo específico detectado: {modelo}")
                     break
                 elif modelo.replace(' ', '') in texto_lower.replace(' ', ''):
                     filtros['modelo'] = modelo.title()
-                    print(f"DEBUG: Modelo específico detectado (sin espacios): {modelo}")
                     break
         else:
             # NUEVO: Si no hay marca, buscar modelo en TODA la base
@@ -153,34 +149,25 @@ class CatalogoAutos:
                     marca_del_modelo = self.df[self.df['model'].str.lower() == modelo]['make'].iloc[0]
                     filtros['modelo'] = modelo.title()
                     filtros['marca'] = marca_del_modelo
-                    print(f"DEBUG: Modelo detectado sin marca: {modelo}")
-                    print(f"DEBUG: Marca inferida: {marca_del_modelo}")
                     break
                 elif modelo.replace(' ', '') in texto_lower.replace(' ', ''):
                     marca_del_modelo = self.df[self.df['model'].str.lower() == modelo]['make'].iloc[0]
                     filtros['modelo'] = modelo.title()
                     filtros['marca'] = marca_del_modelo
-                    print(f"DEBUG: Modelo detectado sin espacios: {modelo}")
-                    print(f"DEBUG: Marca inferida: {marca_del_modelo}")
                     break
         
         # PASO 4: Extraer kilometraje
         if 'pocos kilómetros' in texto_lower or 'bajo kilometraje' in texto_lower:
             filtros['km_max'] = 50000
-            print(f"DEBUG: Bajo kilometraje - km máx: 50000")
         elif 'muchos kilómetros' in texto_lower or 'alto kilometraje' in texto_lower:
             filtros['km_min'] = 100000
-            print(f"DEBUG: Alto kilometraje - km mín: 100000")
         
         # PASO 5: Características específicas
         if 'bluetooth' in texto_lower:
             filtros['bluetooth'] = 'Sí'
-            print(f"DEBUG: Bluetooth requerido")
         if 'carplay' in texto_lower or 'car play' in texto_lower:
             filtros['car_play'] = 'Sí'
-            print(f"DEBUG: CarPlay requerido")
         
-        print(f"DEBUG: Filtros finales extraídos: {filtros}")
         return filtros
                 
     def _aplicar_filtros(self, filtros: Dict[str, Any]) -> pd.DataFrame:
@@ -194,59 +181,47 @@ class CatalogoAutos:
             DataFrame filtrado
         """
         df_filtrado = self.df.copy()
-        print(f"🔍 DEBUG: DataFrame inicial: {len(df_filtrado)} autos")
         
         # Filtro por precio máximo
         if 'precio_max' in filtros:
             df_filtrado = df_filtrado[df_filtrado['price'] <= filtros['precio_max']]
-            print(f"🔍 DEBUG: Después de filtro precio (≤{filtros['precio_max']}): {len(df_filtrado)} autos")
         
         # Filtro por marca
         if 'marca' in filtros:
             df_filtrado = df_filtrado[df_filtrado['make'].str.lower() == filtros['marca'].lower()]
-            print(f"🔍 DEBUG: Después de filtro marca ({filtros['marca']}): {len(df_filtrado)} autos")
         
         # Filtro por modelo específico (NUEVO)
         if 'modelo' in filtros:
             df_filtrado = df_filtrado[df_filtrado['model'].str.lower() == filtros['modelo'].lower()]
-            print(f"🔍 DEBUG: Después de filtro modelo ({filtros['modelo']}): {len(df_filtrado)} autos")
         
         # Filtro por año mínimo
         if 'año_min' in filtros:
             df_filtrado = df_filtrado[df_filtrado['year'] >= filtros['año_min']]
-            print(f"🔍 DEBUG: Después de filtro año mín (≥{filtros['año_min']}): {len(df_filtrado)} autos")
         
         # Filtro por año máximo
         if 'año_max' in filtros:
             df_filtrado = df_filtrado[df_filtrado['year'] <= filtros['año_max']]
-            print(f"🔍 DEBUG: Después de filtro año máx (≤{filtros['año_max']}): {len(df_filtrado)} autos")
         
         # Filtro por kilometraje máximo
         if 'km_max' in filtros:
             df_filtrado = df_filtrado[df_filtrado['km'] <= filtros['km_max']]
-            print(f"🔍 DEBUG: Después de filtro km máx (≤{filtros['km_max']}): {len(df_filtrado)} autos")
         
         # Filtro por kilometraje mínimo
         if 'km_min' in filtros:
             df_filtrado = df_filtrado[df_filtrado['km'] >= filtros['km_min']]
-            print(f"🔍 DEBUG: Después de filtro km mín (≥{filtros['km_min']}): {len(df_filtrado)} autos")
         
         # Filtro por bluetooth
         if 'bluetooth' in filtros:
             df_filtrado = df_filtrado[df_filtrado['bluetooth'] == filtros['bluetooth']]
-            print(f"🔍 DEBUG: Después de filtro bluetooth ({filtros['bluetooth']}): {len(df_filtrado)} autos")
         
         # Filtro por car play
         if 'car_play' in filtros:
             df_filtrado = df_filtrado[df_filtrado['car_play'] == filtros['car_play']]
-            print(f"🔍 DEBUG: Después de filtro car_play ({filtros['car_play']}): {len(df_filtrado)} autos")
-        
-        print(f"🔍 DEBUG: DataFrame final después de todos los filtros: {len(df_filtrado)} autos")
         
         if not df_filtrado.empty:
-            print(f"🔍 DEBUG: Autos encontrados:")
+            logger.debug("Autos encontrados:")
             for idx, auto in df_filtrado.iterrows():
-                print(f"  - {auto['make']} {auto['model']} {auto['year']} - ${auto['price']:,.0f}")
+                logger.debug(f"  - {auto['make']} {auto['model']} {auto['year']} - ${auto['price']:,.0f}")
         
         return df_filtrado
 

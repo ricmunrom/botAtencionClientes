@@ -86,7 +86,6 @@ def extraer_enganche(texto: str, precio_auto: float) -> Optional[float]:
             try:
                 monto = float(matches[0].replace(',', ''))
                 if monto <= precio_auto:
-                    print(f"DEBUG: Enganche encontrado con patrón específico: {monto}")
                     return monto
             except:
                 continue
@@ -101,12 +100,10 @@ def extraer_enganche(texto: str, precio_auto: float) -> Optional[float]:
             if monto < 1000:
                 monto *= 1000
             if monto <= precio_auto:
-                print(f"DEBUG: Enganche encontrado con patrón fallback: {monto}")
                 return monto
         except:
             pass
     
-    print("DEBUG: No se encontró enganche válido")
     return None
 
 def extraer_plazo(texto: str) -> Optional[int]:

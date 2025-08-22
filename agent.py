@@ -11,6 +11,9 @@ from conocimiento_kavak import buscar_informacion
 from catalogo_autos import CatalogoAutos, formatear_lista_autos
 import financiamiento
 import traceback
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class PropuestaValorTool(BaseTool):
@@ -61,7 +64,7 @@ class PropuestaValorTool(BaseTool):
             return "Lo siento, hay un problema técnico con la información. ¿Podrías ser más específico sobre qué te gustaría saber de Kavak?"
         
         except Exception as e:
-            print(f"Error en PropuestaValorTool: {e}")
+            logger.error(f"Error en PropuestaValorTool: {e}")
             return "Disculpa, ocurrió un error al buscar la información. ¿Podrías reformular tu pregunta sobre Kavak?"
 
 
@@ -99,8 +102,6 @@ class CatalogoTool(BaseTool):
             estado.actualizar('ultima_consulta', f"catalogo: {preferencias}")
             estado.actualizar('tipo_consulta', 'busqueda_catalogo')
             
-            print(f"DEBUG CatalogoTool: Procesando: {preferencias}")
-            
             # Inicializar catálogo
             catalogo = CatalogoAutos()
             
@@ -109,23 +110,20 @@ class CatalogoTool(BaseTool):
             
             if stock_id_actual and self._es_consulta_sobre_auto_actual(preferencias):
                 # CASO 1: Ya hay auto seleccionado y pregunta sobre él
-                print(f"DEBUG: Consultando auto actual con stock_id: {stock_id_actual}")
                 return self._procesar_consulta_auto_actual(catalogo, estado, preferencias)
             
             elif self._es_nueva_busqueda(preferencias):
                 # CASO 2: Nueva búsqueda - limpiar auto anterior y buscar por filtros
-                print(f"DEBUG: Nueva búsqueda detectada, limpiando auto anterior")
                 estado.limpiar_auto_completo()
                 return self._procesar_nueva_busqueda(catalogo, estado, preferencias)
             
             else:
                 # CASO 3: Búsqueda normal por filtros (primera vez o sin auto específico)
-                print(f"DEBUG: Búsqueda por filtros")
                 return self._procesar_nueva_busqueda(catalogo, estado, preferencias)
                 
         except Exception as e:
-            print(f"ERROR en CatalogoTool: {e}")
-            traceback.print_exc()
+            logger.error(f"ERROR en CatalogoTool: {e}")
+            logger.error("Traceback completo:", exc_info=True)
             return "Disculpa, ocurrió un error al buscar en el catálogo. ¿Podrías reformular tu búsqueda?"
 
     def _es_consulta_sobre_auto_actual(self, preferencias: str) -> bool:
@@ -215,8 +213,6 @@ class CatalogoTool(BaseTool):
         # Buscar autos según preferencias
         autos_encontrados = catalogo.buscar_autos(preferencias)
         
-        print(f"DEBUG: Encontrados {len(autos_encontrados)} autos")
-        
         # Guardar resultados en el estado
         estado.actualizar_autos_recomendados(autos_encontrados)
         
@@ -231,7 +227,6 @@ class CatalogoTool(BaseTool):
             if auto_especifico:
                 # Guardar el auto específico Y su stock_id
                 estado.actualizar_auto_seleccionado(auto_especifico)
-                print(f"DEBUG: Auto específico seleccionado - stock_id: {auto_especifico.get('stock_id')}")
         
         # Formatear respuesta
         respuesta_formateada = formatear_lista_autos(autos_encontrados)
@@ -321,22 +316,18 @@ class CatalogoTool(BaseTool):
         # Si hay indicadores de interés específico
         for palabra in palabras_interes:
             if palabra in preferencias_lower:
-                print(f"🔍 DEBUG: Detectada palabra de interés: {palabra}")
                 
                 # Si solo hay un auto encontrado, ese es el de interés
                 if len(autos_encontrados) == 1:
-                    print(f"🔍 DEBUG: Solo un auto encontrado, seleccionando automáticamente")
                     return autos_encontrados[0]
                 
                 # Si hay múltiples, buscar coincidencia específica en el texto
                 for auto in autos_encontrados:
                     auto_descripcion = f"{auto.get('make', '')} {auto.get('model', '')}".lower()
                     if auto_descripcion in preferencias_lower:
-                        print(f"🔍 DEBUG: Coincidencia específica encontrada: {auto_descripcion}")
                         return auto
                 
                 # Si no encuentra específico pero hay indicador de interés, tomar el primero
-                print(f"🔍 DEBUG: Palabra de interés pero sin coincidencia específica, tomando el primero")
                 return autos_encontrados[0]
         
         # Buscar modelo específico en las preferencias
@@ -347,25 +338,20 @@ class CatalogoTool(BaseTool):
             
             # Verificar si menciona modelo específico
             if modelo in preferencias_lower and len(preferencias_lower.split()) <= 5:
-                print(f"🔍 DEBUG: Modelo específico mencionado: {modelo}")
                 return auto
             
             # Verificar si menciona marca + modelo
             if f"{marca} {modelo}" in preferencias_lower:
-                print(f"🔍 DEBUG: Marca + modelo mencionados: {marca} {modelo}")
                 return auto
             
             # Verificar si menciona modelo + año
             if modelo in preferencias_lower and año in preferencias_lower:
-                print(f"🔍 DEBUG: Modelo + año mencionados: {modelo} {año}")
                 return auto
         
         # Si la búsqueda es muy específica (pocas palabras) y hay pocos resultados
         if len(preferencias.split()) <= 3 and len(autos_encontrados) <= 2:
-            print(f"🔍 DEBUG: Búsqueda específica con pocos resultados")
             return autos_encontrados[0]
-        
-        print(f"🔍 DEBUG: No se detectó interés específico")
+    
         return None
 
 class FinanzasTool(BaseTool):
@@ -400,8 +386,6 @@ class FinanzasTool(BaseTool):
             estado.actualizar('ultima_consulta', f"financiamiento: {parametros_financiamiento}")
             estado.actualizar('tipo_consulta', 'calculo_financiamiento')
             
-            print(f"DEBUG FinanzasTool: Calculando financiamiento con: {parametros_financiamiento}")
-            
             # Obtener información del auto seleccionado
             auto_precio = estado.obtener('auto_precio')
             auto_info = estado.obtener_info_auto_completa()
@@ -413,8 +397,6 @@ class FinanzasTool(BaseTool):
             # Extraer parámetros del texto del usuario
             enganche_especificado = financiamiento.extraer_enganche(parametros_financiamiento, auto_precio)
             plazo_especifico = financiamiento.extraer_plazo(parametros_financiamiento)
-            
-            print(f"DEBUG FinanzasTool: Precio auto: ${auto_precio:,.0f}, Enganche: {enganche_especificado}, Plazo: {plazo_especifico}")
             
             # Generar respuesta según parámetros especificados
             if enganche_especificado:
@@ -433,8 +415,7 @@ class FinanzasTool(BaseTool):
                     estado.actualizar('plazo_años', plazo_especifico)
                     estado.actualizar('pago_mensual', pago_mensual)
                     
-                    print(f"DEBUG: Guardado en estado - Enganche: ${enganche_especificado:,.0f}, Plazo: {plazo_especifico} años, Pago mensual: ${pago_mensual:,.0f}")
-                
+                    
             else:
                 # Sin enganche específico, mostrar múltiples opciones
                 respuesta = financiamiento.generar_opciones_multiples(auto_info, auto_precio)
@@ -445,8 +426,8 @@ class FinanzasTool(BaseTool):
             return respuesta
             
         except Exception as e:
-            print(f"ERROR en FinanzasTool: {e}")
-            traceback.print_exc()
+            logger.error(f"ERROR en FinanzasTool: {e}")
+            logger.error("Traceback completo:", exc_info=True)
             return "Disculpa, ocurrió un error al calcular el financiamiento. ¿Podrías proporcionar más detalles sobre el enganche que tienes disponible?"
 
 class AgentePrincipal:
@@ -544,19 +525,16 @@ class AgentePrincipal:
             
             # Registrar el mensaje en el historial del usuario
             estado_usuario.actualizar('ultimo_mensaje', mensaje)
-            
-            print(f"🔍 DEBUG: Procesando mensaje: {mensaje}")
-            print(f"🔍 DEBUG: Tools disponibles: {[tool.name for tool in self.tools]}")
+                        
+            logger.info(f"Procesando mensaje: {mensaje}")
+            logger.debug(f"Tools disponibles: {[tool.name for tool in self.tools]}")
             
             # Ejecutar agente
             respuesta = self.agent_executor.invoke({
                 "input": mensaje
             })
-
-            print(f"🔍 DEBUG: Respuesta completa del agente: {respuesta}")
-            print(f"🔍 DEBUG: Pasos intermedios: {respuesta.get('intermediate_steps', [])}")
             
-            # CORRECCIÓN: Usar la respuesta del agente que YA incluye la info de las tools
+            # Usar la respuesta del agente que ya incluye la info de las tools
             respuesta_final = respuesta.get('output', 'Lo siento, no pude procesar tu mensaje.')
             
             # Registrar la respuesta en el estado del usuario
@@ -565,8 +543,8 @@ class AgentePrincipal:
             return respuesta_final
             
         except Exception as e:
-            print(f"❌ ERROR procesando mensaje para {telefono_usuario}: {e}")
-            traceback.print_exc()
+            logger.error(f"ERROR procesando mensaje para {telefono_usuario}: {e}")
+            logger.error("Traceback completo:", exc_info=True) 
             return "Lo siento, ocurrió un error procesando tu consulta. ¿Podrías intentar de nuevo?"
                 
     def obtener_estado_actual(self, telefono_usuario: str) -> Dict[str, Any]:
@@ -590,7 +568,6 @@ class AgentePrincipal:
             telefono_usuario: Número de teléfono del usuario
         """
         self.gestor_estados.reiniciar_estado(telefono_usuario)
-        print(f"Conversación reiniciada para usuario: {telefono_usuario}")
     
     def obtener_historial(self, telefono_usuario: str) -> List[Dict[str, Any]]:
         """

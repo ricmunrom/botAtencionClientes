@@ -2,6 +2,9 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 import pandas as pd
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 def limpiar_nan(valor):
     """
@@ -307,7 +310,7 @@ class GestorEstados:
             # Crear nuevo estado para usuario
             self._estados_usuarios[telefono] = EstadoGlobal()
             self._estados_usuarios[telefono].actualizar('cliente_telefono', telefono)
-            print(f"Nuevo estado creado para usuario: {telefono}")
+            logger.info(f"Nuevo estado creado para usuario: {telefono}")
         
         return self._estados_usuarios[telefono]
     
@@ -323,7 +326,7 @@ class GestorEstados:
         """
         if telefono in self._estados_usuarios:
             del self._estados_usuarios[telefono]
-            print(f"Estado eliminado para usuario: {telefono}")
+            logger.info(f"Estado eliminado para usuario: {telefono}")
             return True
         return False
     

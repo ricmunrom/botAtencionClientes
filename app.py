@@ -3,7 +3,9 @@ import requests
 import os
 from typing import Dict, Optional, Any, List
 from agent import AgentePrincipal
-import traceback
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AtencionClientesBot:
     """
@@ -23,11 +25,11 @@ class AtencionClientesBot:
         
         # Validar configuración
         if not self.page_access_token:
-            print("WARNING: PAGE_ACCESS_TOKEN no configurado")
+            logger.warning("PAGE_ACCESS_TOKEN no configurado")
         if not self.phone_number_id:
-            print("WARNING: PHONE_NUMBER_ID no configurado")
+            logger.warning("PHONE_NUMBER_ID no configurado")
         if not os.getenv('OPENAI_API_KEY'):
-            print("WARNING: OPENAI_API_KEY no configurado")
+            logger.warning("OPENAI_API_KEY no configurado")
     
     def verificar_webhook(self, mode: str, token: str, challenge: str) -> tuple:
         """
@@ -42,10 +44,10 @@ class AtencionClientesBot:
             Tupla (respuesta, código_status)
         """
         if mode == 'subscribe' and token == self.verify_token:
-            print("Webhook verificado exitosamente!")
+            logger.info("Webhook verificado exitosamente!")
             return challenge, 200
         else:
-            print("Verificación falló. Token incorrecto.")
+            logger.warning("Verificación falló. Token incorrecto.")
             return "Forbidden", 403
     
     def procesar_webhook_whatsapp(self, data: Dict) -> tuple:
@@ -59,18 +61,15 @@ class AtencionClientesBot:
             Tupla (respuesta, código_status)
         """
         try:
-            print(f"Webhook recibido: {data}")
-            
+            logger.info(f"Webhook recibido: {data}")
             if data.get('object') == 'whatsapp_business_account':
                 for entry in data.get('entry', []):
                     for change in entry.get('changes', []):
                         if change.get('field') == 'messages':
                             self._procesar_mensajes(change.get('value', {}))
-            
             return "OK", 200
-            
         except Exception as e:
-            print(f"Error procesando webhook: {e}")
+            logger.error(f"Error procesando webhook: {e}")
             return "Error", 500
     
     def _procesar_mensajes(self, value: Dict) -> None:
@@ -94,7 +93,7 @@ class AtencionClientesBot:
                 message_text = message.get('text', {}).get('body', '')
                 
                 if message_text and sender_phone:
-                    print(f"Mensaje de {sender_phone}: {message_text}")
+                    logger.info(f"Mensaje de {sender_phone}: {message_text}")
                     
                     # Procesar mensaje con el agente 
                     respuesta = self.agente.procesar_mensaje(message_text, sender_phone)
@@ -114,7 +113,7 @@ class AtencionClientesBot:
             True si se envió exitosamente, False en caso contrario
         """
         if not self.page_access_token or not self.phone_number_id:
-            print("Error: Credenciales de WhatsApp no configuradas")
+            logger.error("Error: Credenciales de WhatsApp no configuradas")
             return False
         
         url = f"https://graph.facebook.com/v18.0/{self.phone_number_id}/messages"
@@ -135,16 +134,14 @@ class AtencionClientesBot:
         
         try:
             response = requests.post(url, json=payload, headers=headers)
-            
             if response.status_code == 200:
-                print(f"WhatsApp mensaje enviado exitosamente a {recipient_phone}")
+                logger.info(f"WhatsApp mensaje enviado exitosamente a {recipient_phone}")
                 return True
             else:
-                print(f"Error enviando WhatsApp mensaje: {response.status_code} - {response.text}")
+                logger.error(f"Error enviando WhatsApp mensaje: {response.status_code} - {response.text}")
                 return False
-                
         except Exception as e:
-            print(f"Excepción enviando WhatsApp mensaje: {e}")
+            logger.error(f"Excepción enviando WhatsApp mensaje: {e}")
             return False
     
     def obtener_estado_agente(self, telefono: str) -> Dict:
@@ -173,7 +170,7 @@ class AtencionClientesBot:
             self.agente.reiniciar_conversacion(telefono)
             return True
         except Exception as e:
-            print(f"Error reiniciando conversación: {e}")
+            logger.error(f"Error reiniciando conversación: {e}")
             return False
 
     def obtener_resumen_general(self) -> Dict[str, Any]:
@@ -196,7 +193,7 @@ class AtencionClientesBot:
             Número de usuarios eliminados
         """
         usuarios_eliminados = self.agente.gestor_estados.limpiar_estados_antiguos(horas)
-        print(f"Limpiados {usuarios_eliminados} usuarios inactivos por más de {horas} horas")
+        logger.info(f"Limpiados {usuarios_eliminados} usuarios inactivos por más de {horas} horas")
         return usuarios_eliminados
     
     def obtener_usuarios_activos(self) -> List[str]:
@@ -354,13 +351,11 @@ def test_agente():
         mensaje = data.get('mensaje', 'Necesito información sobre los beneficios de Kavak')
         telefono = data.get('telefono', '5215519118275')
         
-        print(f"🔍 DEBUG: Probando agente con mensaje: {mensaje}")
-        print(f"🔍 DEBUG: Teléfono: {telefono}")
-        
+        logger.debug(f"Probando agente con mensaje: {mensaje}")
+        logger.debug(f"Teléfono: {telefono}")
         # Probar agente directamente
         respuesta = bot_atencion.agente.procesar_mensaje(mensaje, telefono)
-        
-        print(f"🔍 DEBUG: Respuesta del agente: {respuesta}")
+        logger.debug(f"Respuesta del agente: {respuesta}")
         
         # Obtener estado después
         estado = bot_atencion.obtener_estado_agente(telefono)
@@ -373,8 +368,8 @@ def test_agente():
         }), 200
         
     except Exception as e:
-        print(f"❌ ERROR en test-agente: {e}")
-        traceback.print_exc()
+        logger.error(f"ERROR en test-agente: {e}")
+        logger.error("Traceback completo:", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
