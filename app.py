@@ -1,13 +1,9 @@
 from flask import Flask, request, jsonify
 import requests
 import os
-#from dotenv import load_dotenv
 from typing import Dict, Optional, Any, List
 from agent import AgentePrincipal
 import traceback
-
-# Cargar variables de entorno
-#load_dotenv()
 
 class AtencionClientesBot:
     """
