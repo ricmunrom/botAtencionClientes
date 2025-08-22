@@ -218,11 +218,6 @@ class CatalogoAutos:
         if 'car_play' in filtros:
             df_filtrado = df_filtrado[df_filtrado['car_play'] == filtros['car_play']]
         
-        if not df_filtrado.empty:
-            logger.debug("Autos encontrados:")
-            for idx, auto in df_filtrado.iterrows():
-                logger.debug(f"  - {auto['make']} {auto['model']} {auto['year']} - ${auto['price']:,.0f}")
-        
         return df_filtrado
 
     def _ordenar_resultados(self, df: pd.DataFrame, filtros: Dict[str, Any]) -> pd.DataFrame:

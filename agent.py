@@ -10,7 +10,6 @@ from estado_global import EstadoGlobal, GestorEstados
 from conocimiento_kavak import buscar_informacion
 from catalogo_autos import CatalogoAutos, formatear_lista_autos
 import financiamiento
-import traceback
 import logging
 
 logger = logging.getLogger(__name__)
@@ -527,7 +526,7 @@ class AgentePrincipal:
             estado_usuario.actualizar('ultimo_mensaje', mensaje)
                         
             logger.info(f"Procesando mensaje: {mensaje}")
-            logger.debug(f"Tools disponibles: {[tool.name for tool in self.tools]}")
+            logger.info(f"Tools disponibles: {[tool.name for tool in self.tools]}")
             
             # Ejecutar agente
             respuesta = self.agent_executor.invoke({

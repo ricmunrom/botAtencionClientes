@@ -5,6 +5,20 @@ from typing import Dict, Optional, Any, List
 from agent import AgentePrincipal
 import logging
 
+# Crear directorio logs si no existe
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+
+# Configuración básica
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('logs/bot.log'),
+        logging.StreamHandler()
+    ]
+)
+
 logger = logging.getLogger(__name__)
 
 class AtencionClientesBot:
@@ -351,11 +365,11 @@ def test_agente():
         mensaje = data.get('mensaje', 'Necesito información sobre los beneficios de Kavak')
         telefono = data.get('telefono', '5215519118275')
         
-        logger.debug(f"Probando agente con mensaje: {mensaje}")
-        logger.debug(f"Teléfono: {telefono}")
+        #logger.debug(f"Probando agente con mensaje: {mensaje}")
+        #logger.debug(f"Teléfono: {telefono}")
         # Probar agente directamente
         respuesta = bot_atencion.agente.procesar_mensaje(mensaje, telefono)
-        logger.debug(f"Respuesta del agente: {respuesta}")
+        #logger.debug(f"Respuesta del agente: {respuesta}")
         
         # Obtener estado después
         estado = bot_atencion.obtener_estado_agente(telefono)
