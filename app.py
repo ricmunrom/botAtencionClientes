@@ -255,7 +255,7 @@ def webhook_receive():
 @app.route('/health')
 def health_check():
     """Health check endpoint"""
-    usuarios_activos = len(bot_atencion.agente.obtener_usuarios_activos())
+    usuarios_activos = len(bot_atencion.obtener_usuarios_activos())
     return {
         "status": "healthy", 
         "service": "atencion-clientes-bot",
