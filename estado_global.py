@@ -1,5 +1,26 @@
 from typing import Dict, Any, Optional, List
 from datetime import datetime
+import pandas as pd
+import numpy as np
+
+def limpiar_nan(valor):
+    """
+    Limpiar valores NaN y problemáticos para JSON serialization
+    
+    Args:
+        valor: Valor a limpiar
+        
+    Returns:
+        Valor limpio compatible con JSON
+    """
+    if pd.isna(valor) or (isinstance(valor, float) and np.isnan(valor)):
+        return None
+    elif isinstance(valor, (np.int64, np.int32)):
+        return int(valor)
+    elif isinstance(valor, (np.float64, np.float32)):
+        return float(valor)
+    else:
+        return valor
 
 class EstadoGlobal:
     """
@@ -146,12 +167,12 @@ class EstadoGlobal:
             Diccionario con resumen del estado
         """
         return {
-            'cliente': self._estado.get('cliente_nombre'),
-            'telefono': self._estado.get('cliente_telefono'),
+            'cliente': limpiar_nan(self._estado.get('cliente_nombre')),
+            'telefono': limpiar_nan(self._estado.get('cliente_telefono')),
             'auto_info': self.obtener_info_auto_completa(),
             'financiamiento_info': self.obtener_info_financiamiento(),
-            'ultima_consulta': self._estado.get('ultima_consulta'),
-            'ultimo_mensaje': self._estado.get('ultimo_mensaje'),
+            'ultima_consulta': limpiar_nan(self._estado.get('ultima_consulta')),
+            'ultimo_mensaje': limpiar_nan(self._estado.get('ultimo_mensaje')),
             'timestamp': self._estado.get('timestamp'),
             'total_acciones': len(self._estado.get('historial_acciones', []))
         }
@@ -164,22 +185,22 @@ class EstadoGlobal:
             Diccionario con información completa del auto
         """
         return {
-            'stock_id': self._estado.get('auto_stock_id'),
-            'precio': self._estado.get('auto_precio'),
-            'marca': self._estado.get('auto_marca'),
-            'modelo': self._estado.get('auto_modelo'),
-            'año': self._estado.get('auto_año'),
-            'kilometraje': self._estado.get('auto_kilometraje'),
-            'version': self._estado.get('auto_version'),
-            'bluetooth': self._estado.get('auto_bluetooth'),
-            'car_play': self._estado.get('auto_car_play'),
+            'stock_id': limpiar_nan(self._estado.get('auto_stock_id')),
+            'precio': limpiar_nan(self._estado.get('auto_precio')),
+            'marca': limpiar_nan(self._estado.get('auto_marca')),
+            'modelo': limpiar_nan(self._estado.get('auto_modelo')),
+            'año': limpiar_nan(self._estado.get('auto_año')),
+            'kilometraje': limpiar_nan(self._estado.get('auto_kilometraje')),
+            'version': limpiar_nan(self._estado.get('auto_version')),
+            'bluetooth': limpiar_nan(self._estado.get('auto_bluetooth')),
+            'car_play': limpiar_nan(self._estado.get('auto_car_play')),
             'dimensiones': {
-                'largo': self._estado.get('auto_largo'),
-                'ancho': self._estado.get('auto_ancho'),
-                'altura': self._estado.get('auto_altura')
+                'largo': limpiar_nan(self._estado.get('auto_largo')),
+                'ancho': limpiar_nan(self._estado.get('auto_ancho')),
+                'altura': limpiar_nan(self._estado.get('auto_altura'))
             }
         }
-
+        
     def actualizar_auto_seleccionado(self, auto_data: Dict[str, Any]) -> None:
         """
         Actualizar toda la información del auto seleccionado desde el CSV
@@ -205,7 +226,8 @@ class EstadoGlobal:
         # Actualizar campos del auto
         for campo_csv, campo_estado in mapeo_campos.items():
             if campo_csv in auto_data:
-                self._estado[campo_estado] = auto_data[campo_csv]
+                valor_limpio = limpiar_nan(auto_data[campo_csv])
+                self._estado[campo_estado] = valor_limpio
         
         # Crear descripción del auto seleccionado
         auto_descripcion = f"{auto_data.get('make', 'N/A')} {auto_data.get('model', 'N/A')} {auto_data.get('year', 'N/A')}"
