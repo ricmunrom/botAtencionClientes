@@ -119,28 +119,50 @@ class CatalogoAutos:
                 except:
                     continue
         
-        # PASO 3: Extraer marca y modelo específico
+        # PASO 3: Extraer marca y modelo específico - MEJORADO SIMPLE
         marcas_conocidas = self.df['make'].str.lower().unique() if not self.df.empty else []
         
+        # Primero buscar marca explícita
+        marca_encontrada = None
         for marca in marcas_conocidas:
             if marca in texto_lower:
                 filtros['marca'] = marca.title()
+                marca_encontrada = marca
                 print(f"DEBUG: Marca detectada: {marca}")
-                
-                # Buscar modelo específico para esa marca
-                modelos_marca = self.df[self.df['make'].str.lower() == marca]['model'].str.lower().unique()
-                for modelo in modelos_marca:
-                    # Buscar el modelo en el texto (considerando espacios y variaciones)
-                    if modelo in texto_lower:
-                        filtros['modelo'] = modelo.title()
-                        print(f"DEBUG: Modelo específico detectado: {modelo}")
-                        break
-                    # También buscar sin espacios por si escriben "ecosport" en lugar de "eco sport"
-                    elif modelo.replace(' ', '') in texto_lower.replace(' ', ''):
-                        filtros['modelo'] = modelo.title()
-                        print(f"DEBUG: Modelo específico detectado (sin espacios): {modelo}")
-                        break
                 break
+        
+        # Buscar modelo específico
+        if marca_encontrada:
+            # Si hay marca, buscar modelos de esa marca
+            modelos_marca = self.df[self.df['make'].str.lower() == marca_encontrada]['model'].str.lower().unique()
+            for modelo in modelos_marca:
+                if modelo in texto_lower:
+                    filtros['modelo'] = modelo.title()
+                    print(f"DEBUG: Modelo específico detectado: {modelo}")
+                    break
+                elif modelo.replace(' ', '') in texto_lower.replace(' ', ''):
+                    filtros['modelo'] = modelo.title()
+                    print(f"DEBUG: Modelo específico detectado (sin espacios): {modelo}")
+                    break
+        else:
+            # NUEVO: Si no hay marca, buscar modelo en TODA la base
+            todos_los_modelos = self.df['model'].str.lower().unique() if not self.df.empty else []
+            for modelo in todos_los_modelos:
+                if modelo in texto_lower:
+                    # Encontrar la marca de este modelo (tomar la primera)
+                    marca_del_modelo = self.df[self.df['model'].str.lower() == modelo]['make'].iloc[0]
+                    filtros['modelo'] = modelo.title()
+                    filtros['marca'] = marca_del_modelo
+                    print(f"DEBUG: Modelo detectado sin marca: {modelo}")
+                    print(f"DEBUG: Marca inferida: {marca_del_modelo}")
+                    break
+                elif modelo.replace(' ', '') in texto_lower.replace(' ', ''):
+                    marca_del_modelo = self.df[self.df['model'].str.lower() == modelo]['make'].iloc[0]
+                    filtros['modelo'] = modelo.title()
+                    filtros['marca'] = marca_del_modelo
+                    print(f"DEBUG: Modelo detectado sin espacios: {modelo}")
+                    print(f"DEBUG: Marca inferida: {marca_del_modelo}")
+                    break
         
         # PASO 4: Extraer kilometraje
         if 'pocos kilómetros' in texto_lower or 'bajo kilometraje' in texto_lower:
@@ -160,7 +182,7 @@ class CatalogoAutos:
         
         print(f"DEBUG: Filtros finales extraídos: {filtros}")
         return filtros
-        
+                
     def _aplicar_filtros(self, filtros: Dict[str, Any]) -> pd.DataFrame:
         """
         Aplicar filtros al DataFrame
