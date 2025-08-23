@@ -341,6 +341,7 @@ cp logs/bot.log logs/backup_$(date +%Y%m%d_%H%M%S).log
 
 - [ ] Integración con base de datos real
 - [ ] Dashboard web para monitoreo
+- [ ] Mejorar parsing de mensajes para extraer múltiples parámetros simultáneos
 - [ ] Soporte para imágenes de vehículos
 - [ ] Integración con CRM
 - [ ] Concurrencia para múltiples usuarios
