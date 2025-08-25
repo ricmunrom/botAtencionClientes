@@ -206,13 +206,13 @@ Bot: Lista detallada de todas las sedes en Ciudad de México...
 Usuario: "Quiero un Toyota del 2020"
 Bot: Lista de autos Toyota 2020 disponibles con precios y características...
 
-Usuario: "Muéstrame el segundo auto"
-Bot: Información detallada del Toyota específico seleccionado...
+Usuario: "Muéstrame que autos Renault tienes disponibles"
+Bot: Información detallada de los autos Renault disponibles...
 ```
 
 ### Financiamiento
 ```
-Usuario: "¿Cómo puedo financiar el Toyota?"
+Usuario: "¿Cómo puedo financiar el Toyota Corolla 2020?"
 Bot: Opciones de financiamiento con diferentes enganches y plazos...
 
 Usuario: "Con enganche de 50000 a 4 años"
